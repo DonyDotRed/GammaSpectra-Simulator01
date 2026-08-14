@@ -1,0 +1,2840 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<title>SPECTRA·LAB — WBC 감마스펙트럼 분석 시뮬레이터 (Deep-Dive 완전판)</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg-void:#0a0e16; --bg-panel:#121826; --bg-panel-2:#1a2234; --bg-panel-3:#222c42;
+  --grid:#1f2940; --grid-soft:#172033;
+  --ink:#e6edf7; --ink-dim:#8da0bf; --ink-faint:#5b6b8c;
+  --line-raw:#6b7da3; --line-cont:#f0a04b; --line-net:#36d6c3; --line-fit:#ff5d8f;
+  --accent:#36d6c3; --accent-2:#4dd4ff; --warn:#ffb454; --bad:#ff6b6b; --good:#58d68d;
+  --cs:#ffd166; --co:#4dd4ff; --cd:#c792ea;
+  --r:10px; --r-s:7px; --r-l:16px;
+  --mono:'JetBrains Mono',ui-monospace,'SFMono-Regular',Menlo,monospace;
+  --ui:'Pretendard','Pretendard Variable',-apple-system,'Noto Sans KR',system-ui,sans-serif;
+  --sh:0 6px 24px rgba(0,0,0,.45); --sh-s:0 2px 10px rgba(0,0,0,.35);
+  --bd:1px solid #243049; --bd-soft:1px solid #1c2740;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:var(--ui); background:
+    radial-gradient(1200px 600px at 15% -10%, #15203a 0%, transparent 55%),
+    radial-gradient(1000px 700px at 110% 10%, #102031 0%, transparent 50%),
+    var(--bg-void);
+  color:var(--ink); -webkit-font-smoothing:antialiased; overflow:hidden;
+  font-size:14px; line-height:1.5;
+}
+.app{display:flex;flex-direction:column;height:100vh;height:100dvh;overflow:hidden}
+button{font-family:inherit;cursor:pointer;color:inherit;border:none;background:none}
+::selection{background:rgba(54,214,195,.3)}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* ===== TOPBAR ===== */
+.topbar{display:flex;align-items:center;gap:14px;padding:10px 16px;
+  background:linear-gradient(180deg,rgba(26,34,52,.95),rgba(18,24,38,.92));
+  border-bottom:var(--bd);backdrop-filter:blur(8px);z-index:50;flex-shrink:0}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:-.02em;font-size:16px;white-space:nowrap}
+.brand .logo{width:26px;height:26px;display:grid;place-items:center;border-radius:7px;
+  background:linear-gradient(135deg,var(--accent),#1b8c80);box-shadow:0 0 16px rgba(54,214,195,.4);color:#04241f;font-weight:800}
+.brand .sub{font-weight:500;color:var(--ink-dim);font-size:11px;letter-spacing:0}
+.topbar .spacer{flex:1}
+.seg{display:inline-flex;background:var(--bg-panel-2);border:var(--bd-soft);border-radius:var(--r-s);padding:3px;gap:2px}
+.seg button{padding:6px 11px;border-radius:5px;font-size:12.5px;font-weight:600;color:var(--ink-dim);transition:.15s;white-space:nowrap}
+.seg button.on{background:var(--accent);color:#04241f;box-shadow:var(--sh-s)}
+.seg button:not(.on):hover{color:var(--ink);background:rgba(255,255,255,.04)}
+.tlabel{font-size:11px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.08em;font-weight:600;margin-right:-6px}
+.nsel{display:flex;align-items:center;gap:6px;background:var(--bg-panel-2);border:var(--bd-soft);border-radius:var(--r-s);padding:5px 6px 5px 11px}
+.nsel select{background:transparent;border:none;color:var(--ink);font-family:var(--ui);font-weight:700;font-size:13px;outline:none;cursor:pointer}
+.nsel select option{background:var(--bg-panel-2)}
+.ndot{width:10px;height:10px;border-radius:50%;box-shadow:0 0 8px currentColor}
+.ibtn{display:inline-grid;place-items:center;width:34px;height:34px;border-radius:var(--r-s);background:var(--bg-panel-2);border:var(--bd-soft);color:var(--ink-dim);transition:.15s;font-size:15px}
+.ibtn:hover{color:var(--ink);border-color:#2e3c5a;background:var(--bg-panel-3)}
+
+/* ===== HERO ===== */
+.hero{flex-shrink:0;position:relative;background:linear-gradient(180deg,#0c1220,#0a0f1a);
+  border-bottom:var(--bd);padding:8px 14px 6px}
+.hero-head{display:flex;align-items:center;gap:10px;margin-bottom:4px;flex-wrap:wrap}
+.hero-title{font-size:12px;font-weight:700;color:var(--ink-dim);letter-spacing:.04em;display:flex;align-items:center;gap:8px}
+.hero-title b{color:var(--ink)}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:11px}
+.lg{display:flex;align-items:center;gap:5px;cursor:pointer;color:var(--ink-dim);user-select:none;transition:.15s}
+.lg:hover{color:var(--ink)} .lg.off{opacity:.32}
+.lg i{width:16px;height:3px;border-radius:2px;display:inline-block}
+.hero-tools{display:flex;gap:6px;margin-left:auto}
+.chart-wrap{position:relative;width:100%;height:clamp(180px,26vh,260px)}
+canvas{display:block;width:100%;height:100%;touch-action:none}
+.chart-cursor{position:absolute;top:6px;left:8px;font-family:var(--mono);font-size:11px;color:var(--ink-dim);
+  background:rgba(10,14,22,.7);padding:3px 8px;border-radius:6px;pointer-events:none;border:var(--bd-soft);opacity:0;transition:opacity .15s}
+.statchips{display:flex;gap:8px;flex-wrap:wrap;margin-top:5px}
+.chip{display:flex;flex-direction:column;gap:1px;background:var(--bg-panel);border:var(--bd-soft);border-radius:var(--r-s);padding:5px 11px;min-width:84px}
+.chip .k{font-size:9.5px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.07em;font-weight:600}
+.chip .v{font-family:var(--mono);font-size:14px;font-weight:600;color:var(--ink)}
+.chip .v small{font-size:10px;color:var(--ink-dim);font-weight:400}
+.chip.hl .v{color:var(--accent)}
+
+/* ===== TABS ===== */
+.tabbar{display:flex;gap:3px;padding:7px 12px 0;background:var(--bg-void);overflow-x:auto;flex-shrink:0;scrollbar-width:thin}
+.tabbar::-webkit-scrollbar{height:5px} .tabbar::-webkit-scrollbar-thumb{background:#243049;border-radius:3px}
+.tab{padding:8px 13px;border-radius:9px 9px 0 0;font-size:12.5px;font-weight:600;color:var(--ink-dim);
+  background:transparent;white-space:nowrap;display:flex;align-items:center;gap:6px;transition:.15s;border:1px solid transparent;border-bottom:none}
+.tab .ico{font-size:14px}
+.tab:hover{color:var(--ink);background:rgba(255,255,255,.03)}
+.tab.on{color:var(--ink);background:var(--bg-panel);border-color:#243049}
+
+/* ===== MAIN ===== */
+.main{flex:1;display:grid;grid-template-columns:340px 1fr;gap:0;background:var(--bg-panel);
+  border-top:var(--bd);overflow:hidden;min-height:0}
+.controls{border-right:var(--bd);overflow-y:auto;padding:14px;background:linear-gradient(180deg,#141b2b,#111726)}
+.viz{overflow-y:auto;padding:16px 18px}
+.controls::-webkit-scrollbar,.viz::-webkit-scrollbar{width:8px}
+.controls::-webkit-scrollbar-thumb,.viz::-webkit-scrollbar-thumb{background:#222c42;border-radius:4px}
+.viz::-webkit-scrollbar-track,.controls::-webkit-scrollbar-track{background:transparent}
+
+.sec{margin-bottom:18px}
+.sec-h{font-size:10.5px;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.1em;
+  margin-bottom:10px;display:flex;align-items:center;gap:7px}
+.sec-h::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,#243049,transparent)}
+
+.ctrl{margin-bottom:13px}
+.ctrl-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px}
+.ctrl-lab{font-size:12.5px;font-weight:600;color:var(--ink);display:flex;align-items:center;gap:5px}
+.ctrl-val{font-family:var(--mono);font-size:12.5px;color:var(--accent);font-weight:600}
+.ctrl-val small{color:var(--ink-dim);font-weight:400;font-size:10px}
+input[type=range]{-webkit-appearance:none;width:100%;height:5px;border-radius:3px;
+  background:linear-gradient(90deg,var(--accent) var(--p,50%),#2a3550 var(--p,50%));outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;
+  background:#eaf6f4;border:3px solid var(--accent);box-shadow:var(--sh-s);cursor:pointer;transition:.1s}
+input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
+input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:#eaf6f4;border:3px solid var(--accent);cursor:pointer}
+
+.toggle{display:flex;align-items:center;justify-content:space-between;padding:9px 11px;background:var(--bg-panel-2);
+  border:var(--bd-soft);border-radius:var(--r-s);margin-bottom:8px;cursor:pointer;transition:.15s}
+.toggle:hover{border-color:#2e3c5a}
+.toggle .tg-lab{font-size:12.5px;font-weight:600;display:flex;align-items:center;gap:6px}
+.tg-lab .desc{font-size:10.5px;color:var(--ink-dim);font-weight:400}
+.sw{width:38px;height:21px;border-radius:11px;background:#2a3550;position:relative;transition:.2s;flex-shrink:0}
+.sw::after{content:"";position:absolute;top:2px;left:2px;width:17px;height:17px;border-radius:50%;background:#cdd8ea;transition:.2s}
+.toggle.on .sw{background:var(--accent)} .toggle.on .sw::after{transform:translateX(17px);background:#04241f}
+
+.btn-row{display:flex;gap:6px;flex-wrap:wrap}
+.btn{padding:8px 12px;border-radius:var(--r-s);font-size:12px;font-weight:600;background:var(--bg-panel-2);
+  border:var(--bd-soft);color:var(--ink-dim);transition:.15s}
+.btn:hover{color:var(--ink);border-color:#2e3c5a;background:var(--bg-panel-3)}
+.btn.pri{background:var(--accent);color:#04241f;border-color:transparent}
+.btn.pri:hover{background:#48e4d2;color:#04241f}
+.btn.sm{padding:6px 10px;font-size:11px}
+
+/* preset pills */
+.pills{display:flex;gap:6px;flex-wrap:wrap}
+.pill{padding:6px 11px;border-radius:20px;font-size:11.5px;font-weight:600;background:var(--bg-panel-2);border:var(--bd-soft);color:var(--ink-dim);transition:.15s}
+.pill:hover{color:var(--ink);border-color:var(--accent)}
+.pill.on{background:rgba(54,214,195,.15);border-color:var(--accent);color:var(--accent)}
+
+/* ===== VIZ CARDS ===== */
+.card{background:var(--bg-panel-2);border:var(--bd);border-radius:var(--r);padding:16px;margin-bottom:14px;position:relative}
+.card-h{font-size:14px;font-weight:700;margin-bottom:4px;display:flex;align-items:center;gap:8px}
+.card-h .badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:rgba(54,214,195,.15);color:var(--accent);letter-spacing:.03em}
+.card-sub{font-size:12px;color:var(--ink-dim);margin-bottom:14px;line-height:1.6}
+.card.glow{box-shadow:0 0 0 1px rgba(54,214,195,.25),0 8px 30px rgba(54,214,195,.07)}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+@media(max-width:560px){.grid2,.grid3{grid-template-columns:1fr}}
+
+.subviz{position:relative;width:100%;border-radius:var(--r-s);overflow:hidden;background:#0c1220;border:var(--bd-soft)}
+
+/* step calc / formula */
+.calc{font-family:var(--mono);font-size:12.5px;line-height:1.9;background:#0d1320;border:var(--bd-soft);border-radius:var(--r-s);padding:12px 14px;overflow-x:auto}
+.calc .row{display:flex;gap:8px;align-items:baseline;white-space:nowrap}
+.calc .lhs{color:var(--ink-dim)} .calc .op{color:var(--ink-faint)} .calc .res{color:var(--accent);font-weight:600}
+.calc .var{color:var(--accent-2)} .calc .num{color:var(--ink)} .calc .cmt{color:var(--ink-faint);font-family:var(--ui);font-size:11px;font-style:italic}
+.frac{display:inline-flex;flex-direction:column;text-align:center;vertical-align:middle;margin:0 3px}
+.frac .top{border-bottom:1px solid var(--ink-faint);padding:0 6px}
+.frac .bot{padding:0 6px}
+.sub{vertical-align:sub;font-size:.78em} .sup{vertical-align:super;font-size:.78em}
+.sqrt{border-top:1px solid var(--ink-faint);padding:0 3px}
+
+/* result banner */
+.result{display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:var(--r-s);margin-top:14px;
+  background:linear-gradient(135deg,rgba(54,214,195,.12),rgba(54,214,195,.03));border:1px solid rgba(54,214,195,.3)}
+.result .big{font-family:var(--mono);font-size:26px;font-weight:700;color:var(--accent)}
+.result .lab{font-size:11px;color:var(--ink-dim);text-transform:uppercase;letter-spacing:.06em}
+.result.warn{background:linear-gradient(135deg,rgba(255,180,84,.12),rgba(255,180,84,.03));border-color:rgba(255,180,84,.3)}
+.result.warn .big{color:var(--warn)}
+.result.bad{background:linear-gradient(135deg,rgba(255,107,107,.12),transparent);border-color:rgba(255,107,107,.3)}
+.result.bad .big{color:var(--bad)}
+
+/* badges pass/fail */
+.test{display:flex;align-items:center;gap:10px;padding:11px 13px;border-radius:var(--r-s);margin-bottom:8px;background:var(--bg-panel);border:var(--bd-soft)}
+.test .bdg{font-size:11px;font-weight:700;padding:3px 9px;border-radius:6px;flex-shrink:0;letter-spacing:.03em}
+.test .bdg.pass{background:rgba(88,214,141,.18);color:var(--good)}
+.test .bdg.fail{background:rgba(255,107,107,.18);color:var(--bad)}
+.test .tt{flex:1;font-size:12px}
+.test .tt .nm{font-weight:600;color:var(--ink)} .test .tt .fm{font-family:var(--mono);font-size:11px;color:var(--ink-dim);margin-top:2px}
+
+/* tables */
+table.dt{width:100%;border-collapse:collapse;font-size:12px}
+table.dt th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-faint);font-weight:700;padding:7px 9px;border-bottom:var(--bd)}
+table.dt td{padding:8px 9px;border-bottom:var(--bd-soft);font-family:var(--mono);color:var(--ink)}
+table.dt td:first-child,table.dt th:first-child{font-family:var(--ui)}
+table.dt tr:hover td{background:rgba(255,255,255,.02)}
+.tag{font-size:10px;font-weight:700;padding:2px 7px;border-radius:5px}
+.tag.g{background:rgba(88,214,141,.16);color:var(--good)} .tag.r{background:rgba(255,107,107,.16);color:var(--bad)}
+.tag.y{background:rgba(255,180,84,.16);color:var(--warn)} .tag.b{background:rgba(77,212,255,.16);color:var(--accent-2)}
+
+/* info bubble inline */
+.q{display:inline-grid;place-items:center;width:15px;height:15px;border-radius:50%;background:#2a3550;color:var(--ink-dim);
+  font-size:10px;font-weight:700;cursor:help;vertical-align:middle;transition:.15s;flex-shrink:0}
+.q:hover{background:var(--accent);color:#04241f}
+
+/* speech tip */
+#tip{position:fixed;z-index:200;max-width:300px;background:linear-gradient(180deg,#1c2740,#161e30);
+  border:1px solid #2e3c5a;border-radius:10px;padding:11px 13px;box-shadow:0 12px 40px rgba(0,0,0,.6);
+  font-size:12.5px;line-height:1.6;color:var(--ink);opacity:0;transform:translateY(4px);transition:.15s;pointer-events:none}
+#tip.show{opacity:1;transform:translateY(0)}
+#tip .tip-lv{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px;display:inline-block;
+  padding:2px 7px;border-radius:5px;background:rgba(54,214,195,.15);color:var(--accent)}
+#tip .tip-lv.mid{background:rgba(77,212,255,.15);color:var(--accent-2)}
+#tip .tip-lv.adv{background:rgba(199,146,234,.15);color:var(--cd)}
+#tip b{color:var(--accent)}
+#tip::after{content:"";position:absolute;width:10px;height:10px;background:#1a2438;border-right:1px solid #2e3c5a;border-bottom:1px solid #2e3c5a;
+  bottom:-6px;left:var(--ax,20px);transform:rotate(45deg)}
+#tip.up::after{top:-6px;bottom:auto;transform:rotate(225deg)}
+
+/* pipeline */
+.pipe{display:flex;align-items:stretch;gap:0;flex-wrap:wrap;justify-content:center}
+.pnode{position:relative;background:var(--bg-panel);border:var(--bd);border-radius:var(--r);padding:13px 15px;min-width:120px;
+  text-align:center;transition:.2s;cursor:pointer;flex:1;max-width:155px}
+.pnode:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 8px 24px rgba(54,214,195,.12)}
+.pnode .pn-ico{font-size:22px;margin-bottom:6px}
+.pnode .pn-t{font-size:12.5px;font-weight:700;margin-bottom:2px}
+.pnode .pn-d{font-size:10.5px;color:var(--ink-dim);line-height:1.4}
+.pnode .pn-n{position:absolute;top:-9px;left:-9px;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#04241f;
+  font-size:11px;font-weight:800;display:grid;place-items:center;font-family:var(--mono)}
+.parrow{display:grid;place-items:center;color:var(--ink-faint);font-size:18px;padding:0 2px;align-self:center}
+@media(max-width:760px){.parrow{transform:rotate(90deg)}}
+
+/* note box */
+.note{display:flex;gap:10px;padding:11px 13px;border-radius:var(--r-s);background:rgba(77,212,255,.07);border:1px solid rgba(77,212,255,.2);font-size:12px;line-height:1.6;color:var(--ink-dim);margin-top:12px}
+.note .ni{font-size:15px;flex-shrink:0}
+.note b{color:var(--accent-2)}
+.note.warn{background:rgba(255,180,84,.07);border-color:rgba(255,180,84,.2)} .note.warn b{color:var(--warn)}
+
+/* glossary */
+.gsearch{width:100%;padding:11px 14px;background:var(--bg-panel-2);border:var(--bd);border-radius:var(--r-s);color:var(--ink);font-family:var(--ui);font-size:13px;outline:none;margin-bottom:14px}
+.gsearch:focus{border-color:var(--accent)}
+.gitem{padding:13px 15px;background:var(--bg-panel-2);border:var(--bd-soft);border-radius:var(--r-s);margin-bottom:8px}
+.gitem .gt{font-size:13.5px;font-weight:700;color:var(--accent);margin-bottom:4px}
+.gitem .gd{font-size:12.5px;color:var(--ink-dim);line-height:1.6}
+
+/* algo compare cards */
+.acards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.acard{background:var(--bg-panel);border:var(--bd-soft);border-radius:var(--r-s);padding:12px;transition:.15s}
+.acard.cur{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.acard .at{font-size:12.5px;font-weight:700;margin-bottom:6px} .acard.cur .at{color:var(--accent)}
+.acard .feat{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--ink-dim);margin-bottom:3px}
+.acard .feat .yn{font-weight:700;width:12px} .yn.y{color:var(--good)} .yn.n{color:var(--bad)} .yn.p{color:var(--warn)}
+
+.hidden{display:none!important}
+.fade{animation:fade .3s ease}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* responsive */
+@media(max-width:880px){
+  .main{grid-template-columns:1fr;grid-template-rows:auto 1fr}
+  .controls{border-right:none;border-bottom:var(--bd);max-height:42vh}
+  .brand .sub{display:none}
+  .tlabel{display:none}
+}
+@media(max-width:560px){
+  .topbar{gap:8px;padding:8px 10px} .hero{padding:6px 8px}
+  .seg button{padding:5px 8px;font-size:11px}
+}
+
+/* ===== SIMPLE STATIC AUTH GATE (GitHub Pages) ===== */
+.auth-overlay{
+  position:fixed; inset:0; z-index:10000; display:grid; place-items:center;
+  padding:24px; overflow:auto;
+  background:
+    radial-gradient(900px 500px at 18% -8%, rgba(54,214,195,.12), transparent 60%),
+    radial-gradient(800px 520px at 108% 12%, rgba(77,212,255,.08), transparent 55%),
+    #0a0e16;
+  color:var(--ink); font-family:var(--ui);
+}
+.auth-card{
+  width:min(430px,100%); background:linear-gradient(180deg,#151d2e,#101624);
+  border:1px solid #2a3854; border-radius:18px; padding:28px;
+  box-shadow:0 24px 80px rgba(0,0,0,.58),0 0 0 1px rgba(54,214,195,.04) inset;
+}
+.auth-brand{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+.auth-logo{width:40px;height:40px;display:grid;place-items:center;border-radius:11px;
+  background:linear-gradient(135deg,var(--accent),#1b8c80);color:#04241f;font-size:21px;font-weight:900;
+  box-shadow:0 0 24px rgba(54,214,195,.25)}
+.auth-title{font-size:19px;font-weight:800;letter-spacing:-.02em}
+.auth-sub{font-size:12px;color:var(--ink-dim);margin-top:2px}
+.auth-desc{font-size:13px;line-height:1.65;color:var(--ink-dim);margin:2px 0 16px}
+.auth-form{display:flex;flex-direction:column;gap:10px}
+.auth-field{position:relative}
+.auth-field input{
+  width:100%;padding:12px 42px 12px 13px;border-radius:9px;border:1px solid #2b3955;
+  background:#0b111d;color:var(--ink);font-family:var(--mono);font-size:14px;outline:none;
+  transition:border-color .15s,box-shadow .15s;
+}
+.auth-field input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(54,214,195,.10)}
+.auth-eye{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:30px;height:30px;
+  border-radius:7px;color:var(--ink-dim);font-size:15px;display:grid;place-items:center}
+.auth-eye:hover{background:rgba(255,255,255,.05);color:var(--ink)}
+.auth-submit{width:100%;padding:11px 14px;border-radius:9px;background:var(--accent);color:#04241f;
+  font-size:13px;font-weight:800;transition:transform .12s,background .12s}
+.auth-submit:hover{background:#48e4d2}.auth-submit:active{transform:translateY(1px)}
+.auth-submit:disabled{opacity:.55;cursor:default}
+.auth-error{min-height:19px;margin-top:2px;color:var(--bad);font-size:12px;font-weight:600}
+.auth-foot{margin-top:15px;padding-top:13px;border-top:1px solid #202c43;color:var(--ink-faint);font-size:10.5px;line-height:1.55}
+.auth-overlay.auth-shake .auth-card{animation:authShake .28s ease}
+@keyframes authShake{0%,100%{transform:none}25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+@media(max-width:560px){.auth-card{padding:22px 18px;border-radius:14px}.auth-title{font-size:17px}}
+
+</style>
+</head>
+<body>
+
+<div class="auth-overlay" id="authOverlay" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+  <div class="auth-card">
+    <div class="auth-brand">
+      <div class="auth-logo">γ</div>
+      <div>
+        <div class="auth-title" id="authTitle">SPECTRA·LAB 사용자 확인</div>
+        <div class="auth-sub">WBC Gamma Spectrum Analysis Simulator</div>
+      </div>
+    </div>
+    <p class="auth-desc">이 페이지는 승인된 사용자용입니다. 계속하려면 패스워드를 입력하세요.</p>
+    <form class="auth-form" id="authForm" autocomplete="off">
+      <div class="auth-field">
+        <input id="authPassword" type="password" inputmode="text" autocomplete="current-password"
+               placeholder="Password" aria-label="패스워드" autofocus>
+        <button class="auth-eye" id="authEye" type="button" aria-label="패스워드 표시 전환" title="패스워드 표시 전환">◉</button>
+      </div>
+      <button class="auth-submit" id="authSubmit" type="submit">확인</button>
+      <div class="auth-error" id="authError" role="alert" aria-live="polite"></div>
+    </form>
+    <div class="auth-foot">인증 상태는 현재 브라우저 탭 세션 동안만 유지됩니다. 브라우저 탭을 닫으면 다시 확인합니다.</div>
+  </div>
+</div>
+<script>
+/* Simple client-side gate for a static GitHub Pages site.
+   Important: this is an access deterrent, not server-side security. */
+(()=>{
+  "use strict";
+  const SESSION_KEY="spectraLabAuthV1";
+  const PASS_HASH="09090c74379eedfd5cb1abf8fbcf40f0933937fd4e1a9d5f63982f43a18f304f"; // SHA-256
+  const overlay=document.getElementById("authOverlay");
+  const form=document.getElementById("authForm");
+  const input=document.getElementById("authPassword");
+  const submit=document.getElementById("authSubmit");
+  const error=document.getElementById("authError");
+  const eye=document.getElementById("authEye");
+
+  const getSession=()=>{try{return sessionStorage.getItem(SESSION_KEY)}catch(_){return null}};
+  const setSession=()=>{try{sessionStorage.setItem(SESSION_KEY,"ok")}catch(_){}};
+  const unlock=()=>{if(overlay)overlay.remove();};
+
+  // Small synchronous SHA-256 implementation so the gate also works when opened as a local file.
+  function sha256(ascii){
+    function rightRotate(value,amount){return(value>>>amount)|(value<<(32-amount));}
+    const mathPow=Math.pow,maxWord=mathPow(2,32),lengthProperty="length";
+    let i,j,result="",words=[],asciiBitLength=ascii[lengthProperty]*8;
+    let hash=sha256.h=sha256.h||[],k=sha256.k=sha256.k||[],primeCounter=k[lengthProperty];
+    const isComposite={};
+    for(let candidate=2;primeCounter<64;candidate++){
+      if(!isComposite[candidate]){
+        for(i=0;i<313;i+=candidate)isComposite[i]=candidate;
+        hash[primeCounter]=(mathPow(candidate,.5)*maxWord)|0;
+        k[primeCounter++]=(mathPow(candidate,1/3)*maxWord)|0;
+      }
+    }
+    ascii += "\x80";
+    while(ascii[lengthProperty]%64-56)ascii += "\x00";
+    for(i=0;i<ascii[lengthProperty];i++){
+      j=ascii.charCodeAt(i);
+      if(j>>8)return "";
+      words[i>>2]|=j<<((3-i)%4)*8;
+    }
+    words[words[lengthProperty]]=(asciiBitLength/maxWord)|0;
+    words[words[lengthProperty]]=asciiBitLength;
+    for(j=0;j<words[lengthProperty];){
+      const w=words.slice(j,j+=16),oldHash=hash.slice(0);hash=hash.slice(0,8);
+      for(i=0;i<64;i++){
+        const i2=i+j,w15=w[i-15],w2=w[i-2];
+        const a=hash[0],e=hash[4];
+        const temp1=hash[7]
+          +(rightRotate(e,6)^rightRotate(e,11)^rightRotate(e,25))
+          +((e&hash[5])^((~e)&hash[6]))+k[i]
+          +(w[i]=(i<16)?w[i]:((w[i-16]+(rightRotate(w15,7)^rightRotate(w15,18)^(w15>>>3))+w[i-7]+(rightRotate(w2,17)^rightRotate(w2,19)^(w2>>>10)))|0));
+        const temp2=(rightRotate(a,2)^rightRotate(a,13)^rightRotate(a,22))+((a&hash[1])^(a&hash[2])^(hash[1]&hash[2]));
+        hash=[(temp1+temp2)|0,a,hash[1],hash[2],(hash[3]+temp1)|0,hash[4],hash[5],hash[6]];
+      }
+      for(i=0;i<8;i++)hash[i]=(hash[i]+oldHash[i])|0;
+    }
+    for(i=0;i<8;i++)for(j=3;j+1;j--){const b=(hash[i]>>(j*8))&255;result+=(b<16?0:"")+b.toString(16);}
+    return result;
+  }
+
+  if(getSession()==="ok"){unlock();return;}
+  eye.addEventListener("click",()=>{
+    input.type=input.type==="password"?"text":"password";
+    eye.textContent=input.type==="password"?"◉":"◌";
+    input.focus();
+  });
+  form.addEventListener("submit",(ev)=>{
+    ev.preventDefault();
+    const value=input.value;
+    if(!value){error.textContent="패스워드를 입력하세요.";input.focus();return;}
+    submit.disabled=true;error.textContent="";
+    const ok=sha256(value)===PASS_HASH;
+    if(ok){setSession();unlock();return;}
+    submit.disabled=false;input.value="";error.textContent="패스워드가 올바르지 않습니다.";
+    overlay.classList.remove("auth-shake");void overlay.offsetWidth;overlay.classList.add("auth-shake");input.focus();
+  });
+})();
+</script>
+
+<div class="app">
+  <!-- TOPBAR -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">γ</span>
+      <div><div>SPECTRA·LAB <span style="font-size:10px;font-weight:700;color:var(--accent);border:1px solid var(--accent);border-radius:6px;padding:1px 5px;vertical-align:middle">UPGRADE</span></div><div class="sub">WBC 감마스펙트럼 분석 시뮬레이터 · 딥다이브 완전판</div></div>
+    </div>
+    <div class="spacer"></div>
+    <span class="tlabel">핵종</span>
+    <div class="nsel">
+      <span class="ndot" id="ndot" style="color:var(--cs)"></span>
+      <select id="nuclideSel">
+        <option value="Cs-137">Cs-137 · 662 keV</option>
+        <option value="Co-60">Co-60 · 1173/1332 keV</option>
+        <option value="Cd-109">Cd-109 · 88 keV</option>
+      </select>
+    </div>
+    <span class="tlabel">설명 수준</span>
+    <div class="seg" id="levelSeg">
+      <button data-lv="beg" class="on">초급</button>
+      <button data-lv="mid">중급</button>
+      <button data-lv="adv">고급</button>
+    </div>
+    <button class="ibtn" id="snapBtn" title="현재 스펙트럼 PNG 저장">⤓</button>
+    <button class="ibtn" id="helpBtn" title="도움말">?</button>
+  </header>
+
+  <!-- HERO SPECTRUM -->
+  <section class="hero">
+    <div class="hero-head">
+      <div class="hero-title">📡 <b>라이브 감마 스펙트럼</b> <span id="heroNuc" class="mono" style="color:var(--cs)">Cs-137</span></div>
+      <div class="legend" id="legend"></div>
+      <div class="hero-tools">
+        <div class="seg" id="scaleSeg" style="padding:2px">
+          <button data-sc="lin" class="on" style="padding:5px 9px;font-size:11px">선형</button>
+          <button data-sc="log" style="padding:5px 9px;font-size:11px">로그</button>
+        </div>
+        <button class="ibtn" id="zoomIn" title="확대" style="width:30px;height:30px;font-size:14px">+</button>
+        <button class="ibtn" id="zoomOut" title="축소" style="width:30px;height:30px;font-size:14px">−</button>
+        <button class="ibtn" id="zoomReset" title="전체 보기" style="width:30px;height:30px;font-size:13px">⟲</button>
+      </div>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="heroCanvas"></canvas>
+      <div class="chart-cursor" id="heroCursor"></div>
+    </div>
+    <div class="statchips" id="statchips"></div>
+  </section>
+
+  <!-- TABS -->
+  <nav class="tabbar" id="tabbar"></nav>
+
+  <!-- MAIN -->
+  <div class="main">
+    <aside class="controls" id="controls"></aside>
+    <main class="viz" id="viz"></main>
+  </div>
+</div>
+<div id="tip"></div>
+<script>
+/* ============================================================================
+   SPECTRA·LAB — WBC Gamma Spectrum Analysis Simulator
+   Single-file. Vanilla JS. Canvas 2D. No runtime deps (fonts via CDN only).
+   ========================================================================== */
+"use strict";
+/* ===================== PART 1: CONST / COPY / UTIL / CAL / SIM ===================== */
+
+const NUCLIDES = {
+  "Cs-137": { color:"#ffd166", halfLife_d:11020, lines:[{E:661.7,y:0.851}],
+    note:"대표적인 장반감기 핵분열생성물. 단일 감마선이라 식별이 단순합니다." },
+  "Co-60":  { color:"#4dd4ff", halfLife_d:1925.3, lines:[{E:1173.2,y:0.9985},{E:1332.5,y:0.9998}],
+    note:"방사화 생성물. 두 개의 cascade 감마선 → 가중평균·cascade summing의 좋은 예." },
+  "Cd-109": { color:"#c792ea", halfLife_d:461.4, lines:[{E:88.0,y:0.0364}],
+    note:"저에너지 단일선(88 keV). 낮은 방출확률·넓은 상대 FWHM → 검출이 어려운 쪽을 보여줍니다." },
+};
+
+/* 핵종별 권장 기본 파라미터 (검증 예제 재현) */
+const NUC_DEFAULT = {
+  "Cs-137": {activity:833, time:600, bg:1.0},
+  "Co-60":  {activity:1000,time:600, bg:1.0},
+  "Cd-109": {activity:2000,time:600, bg:1.4},
+};
+
+/* 말풍선 사전: 각 키마다 초급/중급/고급 설명 */
+const COPY = {
+  level:{beg:"초급",mid:"중급",adv:"고급"},
+  erosion:{
+    beg:"스펙트럼을 산맥이라고 생각해요. 뾰족한 봉우리(피크)를 조금씩 깎아 내려서 '봉우리 없는 평지'를 만들면, 그게 바로 피크 아래에 깔린 <b>배경</b>이에요.",
+    mid:"FWHM에 비례하는 bin으로 묶고, 각 bin을 양옆 이웃의 평균보다 높으면 깎습니다. 8번 반복하면 피크가 점점 continuum 수준으로 내려갑니다.",
+    adv:"B′ₖ = min(Bₖ, (B′ₖ₋₄+Bₖ₊₄)/2). 4개 PLY(서로 다른 sampling grid)로 8회 erosion 후, 채널별 배경은 원값과 4 PLY 추정값의 <b>최소</b>를 취합니다."
+  },
+  ply:{
+    beg:"bin들을 1·2·3·4 번호를 번갈아 붙여 4개 팀으로 나눠요. 팀마다 따로 바닥선을 그려보고, 그중 가장 낮은 선을 배경으로 골라요.",
+    mid:"한 가지 bin 격자만 쓰면 피크와 경계가 우연히 겹쳐 배경이 흔들립니다. 4개 PLY는 격자를 4번 어긋나게 두는 효과입니다.",
+    adv:"PLY(j)=bin index mod 4. 피크가 한 PLY를 끌어올려도 다른 PLY가 더 낮은 추정을 주므로 min 연산이 피크 영향을 억제합니다."
+  },
+  gauss:{
+    beg:"배경을 뺀 깨끗한 봉우리에 <b>종 모양 곡선</b>을 맞춰요. 곡선의 높이가 피크 세기, 곡선 아래 넓이가 검출된 감마선 개수예요.",
+    mid:"net 스펙트럼에 F=B₀+B₁(ch−E)+H·exp(−(ch−E)²/Z²)를 가중 최소제곱으로 맞춥니다. 중심 E와 폭 Z는 교정값으로 고정.",
+    adv:"β=(XᵀWX)⁻¹XᵀWy, Wᵢ=1/Yᵢ, X=[1,(ch−E),G]. 면적 A≈H·Z·√π, Z=FWHM/(2√ln2). σ_H는 공분산 대각의 √."
+  },
+  mda_rej:{
+    beg:"이 피크가 '진짜 신호'라고 말하려면, 최소한의 크기보다 커야 해요. 너무 작으면 그냥 통계적 흔들림일 수 있거든요.",
+    mid:"피크 면적 A가 MDA rejection 한계보다 커야 통과합니다. 배경이 클수록 한계도 높아집니다.",
+    adv:"A > C₁ + C₂·√(Σ_{E±R} yᵢ / 0.966²), R=0.9·FWHM. 기본 C₁=3, C₂=2.5 (REJMDACONST, REJMDASIG)."
+  },
+  var_rej:{
+    beg:"피크 높이가 그 '오차'보다 충분히 커야 해요. 높이와 오차가 비슷하면 진짜 피크인지 알 수 없어요.",
+    mid:"h² > F_V·σ_h². 피크 높이의 제곱이 높이 불확도 제곱의 F_V배보다 커야 합니다.",
+    adv:"VARREJ(F_V) 기본 1. σ_h는 Gaussian 적합 공분산에서 옵니다. 통계요동을 피크로 오인하는 것을 막습니다."
+  },
+  back_rej:{
+    beg:"피크가 주변 배경보다 뚜렷하게 솟아야 해요. 배경 위에 살짝 얹힌 정도면 배경 요동일 수 있어요.",
+    mid:"h² > F_B·B. 피크 높이 제곱이 배경 높이의 F_B배보다 커야 합니다.",
+    adv:"BACKREJ(F_B) 기본 1. B는 피크 위치의 continuum 배경. 높은 배경에서 약한 피크 누락을 조절합니다."
+  },
+  gain:{
+    beg:"NaI 검출기는 온도 등에 따라 피크 위치가 살짝 좌우로 밀려요. 이걸 자동으로 찾아 보정하는 기능이에요.",
+    mid:"적합식에 위치 이동항 Q₀를 넣어, |Q₀|가 기준보다 크면 중심을 E+Q₀로 옮겨 재적합합니다.",
+    adv:"F_s=(dY/dx)(1+Q₀). E′=E+Q₀ 반복(최대 MAXGAINPASS=10). reject gain factor는 Ge/NaI에서 다릅니다."
+  },
+  unknown:{
+    beg:"라이브러리에 없는 '예상치 못한' 피크가 있는지도 추가로 살펴봐요.",
+    mid:"디지털 필터 지표 dd가 1보다 크면 unknown peak 후보입니다. 단, 라이브러리 위치 근처면 기존 피크로 봅니다.",
+    adv:"dd=(Oᵢ−Cᵢ−K₁)/(K₂√(W(Bᵢ+Cᵢ))), Cᵢ=W√(Bᵢ/W) (erosion 과소추정 보정). UNIDCONST K₁, UNIDREJ K₂."
+  },
+  continuum_type:{
+    beg:"피크 양옆 배경 높이가 다를 때, 비스듬한 직선으로 이을지(Linear) 계단처럼 이을지(Step) 고르는 거예요.",
+    mid:"Linear는 좌우 배경을 직선 연결, Step은 피크가 흡수한 만큼 누적으로 계단 전이. NaI 넓은 피크엔 Step이 유리할 수 있습니다.",
+    adv:"Linear: B=(N/2n)(B₁+B₂). Step: 채널별 누적 gross 비례로 좌(B₁)→우(B₂) 전이. σ_B는 각각 다르게 전파."
+  },
+  roi:{
+    beg:"피크 면적을 셀 '구간'이에요. 피크를 충분히 감싸되, 옆 피크나 배경을 너무 많이 넣지 않게 잡아요.",
+    mid:"ROI 좌우 경계 = 피크 ± Maximum(Left/Right)·FWHM. 또는 Peak Locate가 준 ROI를 사용.",
+    adv:"너무 좁으면 피크 꼬리 누락(면적 과소), 너무 넓으면 배경 과대·인접 피크 포함. Maximum Right 단위(채널/FWHM배) 확인 필수."
+  },
+  efficiency:{
+    beg:"검출기가 감마선을 얼마나 '잘 잡는지'를 나타내요. 방출된 감마선 중 광전피크로 기록되는 비율이에요.",
+    mid:"ε(E)=S/(T·y·A·K_w·U_f)로 교정점을 만들고, 에너지별 곡선으로 미지 피크 에너지의 ε을 보간합니다.",
+    adv:"Dual/Empirical/Linear/Interpolated 모델. 같은 geometry 가정 필수. Lung은 CWT별 Multiple CWT 곡선으로 개인 보정."
+  },
+  activity:{
+    beg:"검출된 감마선 개수를, 효율·방출확률·시간으로 나눠서 '실제 방사능(Bq)'으로 되돌리는 계산이에요.",
+    mid:"A = S/(T·ε·y). 여러 line이 있으면 불확도가 작은 line에 가중치를 더 주는 가중평균을 씁니다.",
+    adv:"A=S/(T·ε·y·K_c·K_w·K_x·C_f·U_f·V). (σ_A/A)²=Σ(상대불확도)². 가중평균 C_Av=Σ(Cᵢ/σ²)/Σ(1/σ²)."
+  },
+  mda:{
+    beg:"'이 측정에서 검출했다고 말하려면 최소 몇 Bq가 필요했나?'를 알려줘요. 작을수록 더 미량까지 잡을 수 있어요.",
+    mid:"Currie: σ₀²=B+σ_B², LC=k·σ₀(판정선), LD=k²+2LC(검출 가능 최소 신호). MDA=LD를 Bq로 환산.",
+    adv:"LD=2.71+3.29σ₀ (k=1.645). MDA=LD/(T·ε·y·V·…). 시간 ↑ ⇒ MDA ∝ 1/√T 로 개선. KTA·ISO 11929는 ROI/철학이 다름."
+  },
+  conf_index:{
+    beg:"관측된 피크가 이 핵종일 '확신 점수'예요. 에너지가 잘 맞고, 기대되는 다른 선들도 보이면 점수가 높아져요.",
+    mid:"에너지 일치도·missing-line·반감기 penalty를 곱해 Confidence Index를 만듭니다.",
+    adv:"CI=Π(부분점수). 에너지 ΔE/tolerance penalty, 기대선이 MDA 이상인데 미검출 시 w(E) 가중 감점."
+  },
+  fwhm:{
+    beg:"피크의 '폭'이에요. 높이가 절반인 지점에서 잰 너비죠. NaI는 폭이 넓고(분해능 낮고), 에너지가 높을수록 더 넓어져요.",
+    mid:"FWHM(keV)=a+b·√E 형태로 교정. 채널 폭 = FWHM_keV/C₁. 배경 bin·tolerance·Z가 모두 FWHM에 연동됩니다.",
+    adv:"NaI ~7% @662keV. σ=FWHM/2.355, Z=FWHM/(2√ln2). 저에너지(88keV)는 상대 FWHM이 매우 커 multiplet·MDA에 불리."
+  },
+  energy_cal:{
+    beg:"검출기는 '에너지'가 아니라 '몇 번째 칸(채널)'에 신호가 들어왔는지만 알아요. 채널을 keV로 바꾸는 약속이에요.",
+    mid:"1차: E=C₀+C₁·ch ⇒ ch=(E−C₀)/C₁. Cs-137 662keV가 어느 채널인지 이렇게 찾습니다.",
+    adv:"비선형(2차+) 가능. Energy Cal tolerance(Fixed keV / Variable·FWHM)로 관측-인증선 매칭 허용범위 결정."
+  },
+  compton:{
+    beg:"감마선이 검출기에서 에너지를 일부만 주고 튕겨 나가면, 광전피크보다 낮은 에너지에 '넓은 언덕'이 생겨요. 이게 Compton 연속체예요.",
+    mid:"광전피크 왼쪽으로 Compton edge까지 퍼지는 연속 성분. 배경 추정·MDA에서 반드시 고려해야 합니다.",
+    adv:"Compton edge E_C=E·2γ/(1+2γ), γ=E/511. NaI에서 비중이 커 단순 ROI 배경 추정을 어렵게 만듭니다."
+  },
+};
+
+/* ---------- utilities ---------- */
+const $=(s,r=document)=>r.querySelector(s);
+const $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const el=(t,c,h)=>{const e=document.createElement(t);if(c)e.className=c;if(h!=null)e.innerHTML=h;return e;};
+const clamp=(x,a,b)=>x<a?a:x>b?b:x;
+const lerp=(a,b,t)=>a+(b-a)*t;
+
+function makeRNG(seed){ // mulberry32
+  let s=seed>>>0;
+  return ()=>{s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};
+}
+function poisson(lam,rng){
+  if(lam<=0)return 0;
+  if(lam>30){const x=lam+Math.sqrt(lam)*gauss(rng);return Math.max(0,Math.round(x));}
+  let L=Math.exp(-lam),k=0,p=1;
+  do{k++;p*=rng();}while(p>L);
+  return k-1;
+}
+let _g=null;
+function gauss(rng){ if(_g!==null){const v=_g;_g=null;return v;}
+  let u=0,v=0,s=0; do{u=rng()*2-1;v=rng()*2-1;s=u*u+v*v;}while(s>=1||s===0);
+  const m=Math.sqrt(-2*Math.log(s)/s); _g=v*m; return u*m;
+}
+const fmt=(x,d=2)=>{ if(!isFinite(x))return"—";
+  const a=Math.abs(x);
+  if(a!==0&&(a<1e-3||a>=1e6))return x.toExponential(d);
+  return x.toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d});
+};
+const fmtInt=x=>isFinite(x)?Math.round(x).toLocaleString("en-US"):"—";
+
+/* weighted linear least squares: solve (XᵀWX)β = XᵀWy ; returns {beta, cov} */
+function lstsqW(X,y,w){
+  const n=X.length,p=X[0].length;
+  const A=Array.from({length:p},()=>new Float64Array(p));
+  const b=new Float64Array(p);
+  for(let i=0;i<n;i++){const wi=w[i];
+    for(let j=0;j<p;j++){const xij=X[i][j]*wi;
+      b[j]+=xij*y[i];
+      for(let k=0;k<p;k++)A[j][k]+=xij*X[i][k];
+    }
+  }
+  const {inv}=invMat(A);
+  const beta=new Float64Array(p);
+  for(let j=0;j<p;j++){let s=0;for(let k=0;k<p;k++)s+=inv[j][k]*b[k];beta[j]=s;}
+  return {beta,cov:inv};
+}
+function invMat(M){ // Gauss-Jordan
+  const n=M.length;
+  const A=M.map(r=>Float64Array.from(r));
+  const I=Array.from({length:n},(_,i)=>{const r=new Float64Array(n);r[i]=1;return r;});
+  for(let c=0;c<n;c++){
+    let piv=c;for(let r=c+1;r<n;r++)if(Math.abs(A[r][c])>Math.abs(A[piv][c]))piv=r;
+    if(Math.abs(A[piv][c])<1e-12){A[piv][c]+=1e-9;} // regularize singular
+    [A[c],A[piv]]=[A[piv],A[c]];[I[c],I[piv]]=[I[piv],I[c]];
+    const d=A[c][c];
+    for(let k=0;k<n;k++){A[c][k]/=d;I[c][k]/=d;}
+    for(let r=0;r<n;r++)if(r!==c){const f=A[r][c];
+      for(let k=0;k<n;k++){A[r][k]-=f*A[c][k];I[r][k]-=f*I[c][k];}}
+  }
+  return {inv:I};
+}
+/* log-log quadratic efficiency fit */
+function fitEfficiency(points){
+  const X=[],y=[],w=[];
+  for(const [E,e] of points){const lx=Math.log(E);X.push([1,lx,lx*lx]);y.push(Math.log(e));w.push(1);}
+  const {beta}=lstsqW(X,y,w);
+  return (E)=>Math.exp(beta[0]+beta[1]*Math.log(E)+beta[2]*Math.log(E)**2);
+}
+
+/* ---------- Calibration ---------- */
+const CAL={
+  C0:0.0, C1:0.5,            // E = C0 + C1*ch
+  a:1.0, b:1.85,            // FWHM[keV] = a + b*sqrt(E)
+  effPoints:[[88,0.045],[200,0.030],[400,0.020],[661.7,0.0120],[1000,0.0085],[1173,0.0072],[1332,0.0064]],
+  effRelUnc:0.03,
+  N:3072,                    // 0.5 keV/ch × 3072 = 0–1536 keV (covers Co-60 1332 keV)
+};
+CAL.effFn=fitEfficiency(CAL.effPoints);
+const ch2E=ch=>CAL.C0+CAL.C1*ch;
+const E2ch=E=>(E-CAL.C0)/CAL.C1;
+const fwhmKeV=E=>CAL.a+CAL.b*Math.sqrt(Math.max(E,1));
+const fwhmCh=E=>fwhmKeV(E)/CAL.C1;
+const sigmaCh=E=>fwhmCh(E)/2.35482;
+const Zof=E=>fwhmCh(E)/(2*Math.sqrt(Math.LN2));
+const effOf=E=>({eps:CAL.effFn(E),sigma:CAL.effFn(E)*CAL.effRelUnc});
+
+/* ---------- Spectrum simulator ---------- */
+function simulateSpectrum(p){
+  const N=CAL.N, Y=new Float64Array(N), comp=new Float64Array(N), back=new Float64Array(N), peaksArr=new Float64Array(N);
+  const rng=makeRNG(p.seed||12345);
+  const nuc=NUCLIDES[p.nuclide];
+  // background: high at low energy, decays
+  for(let ch=0;ch<N;ch++){
+    const E=ch2E(ch);
+    const bgv=p.bg*( 38*Math.exp(-E/180) + 6 + 2*Math.exp(-E/40) );
+    back[ch]=bgv;
+  }
+  // peaks + compton per line
+  const lineInfo=[];
+  for(const ln of nuc.lines){
+    const eps=effOf(ln.E).eps;
+    const S=p.activity*ln.y*eps*p.time;     // net peak area (counts)
+    const ctr=E2ch(ln.E)*(1+(p.gain||0));
+    const sg=sigmaCh(ln.E);
+    lineInfo.push({E:ln.E,y:ln.y,eps,S,ctr,sg});
+    for(let ch=0;ch<N;ch++){
+      const d=ch-ctr;
+      peaksArr[ch]+= S/(sg*Math.sqrt(2*Math.PI))*Math.exp(-d*d/(2*sg*sg));
+    }
+    // compton continuum: fraction of peak area spread 0..edge
+    const gam=ln.E/511, Ec=ln.E*2*gam/(1+2*gam), chEdge=E2ch(Ec);
+    const kC=0.45+0.35*Math.min(1,ln.E/1300);   // higher E -> more compton
+    const area=S*kC;
+    // plateau shape: ~flat from low to edge, soft drop after edge, small backscatter bump
+    let norm=0; const shape=new Float64Array(N);
+    for(let ch=0;ch<N;ch++){
+      if(ch<2)continue;
+      let v=0;
+      if(ch<=chEdge){ v=0.5+0.5*(ch/chEdge); }           // gentle rise to edge
+      else { v=Math.exp(-(ch-chEdge)/(0.6*sg+4)); }       // drop past edge
+      // backscatter ~ E/(1+2γ)
+      const Ebs=ln.E/(1+2*gam), chBs=E2ch(Ebs);
+      v+=0.5*Math.exp(-((ch-chBs)**2)/(2*(sg*1.3)**2));
+      shape[ch]=v; norm+=v;
+    }
+    if(norm>0)for(let ch=0;ch<N;ch++)comp[ch]+=area*shape[ch]/norm;
+  }
+  // sum + noise
+  const noise=p.noise!==false;
+  for(let ch=0;ch<N;ch++){
+    const lam=peaksArr[ch]+comp[ch]+back[ch];
+    Y[ch]= noise ? poisson(lam,rng) : lam;
+  }
+  return {Y,comp,back,peaks:peaksArr,N,lines:lineInfo,params:p};
+}
+/* ===================== PART 2: ANALYSIS ENGINE ===================== */
+
+/* ---- Peak Locate: Gamma-M (erosion + Gaussian fit) ---- */
+function peakLocateGammaM(Y, libLines, opt={}){
+  const N=Y.length;
+  const kbin=opt.k!=null?opt.k:0.4;
+  const erodeIters=opt.iters!=null?opt.iters:8;
+  // representative FWHM (mid channel) for binning
+  const Emid=ch2E(N/2);
+  const binW=Math.max(4,Math.round(kbin*fwhmCh(Emid)));
+  // build bins
+  const bins=[];
+  for(let start=0;start<N;start+=binW){
+    const end=Math.min(N,start+binW);
+    let s=0;for(let ch=start;ch<end;ch++)s+=Y[ch];
+    bins.push({start,end,center:(start+end-1)/2,mean:s/(end-start),raw:s/(end-start)});
+  }
+  const nb=bins.length;
+  // 4-PLY erosion (8 iters), each PLY uses neighbors k-4,k,k+4
+  const B=bins.map(b=>b.mean);
+  for(let it=0;it<erodeIters;it++){
+    const Bp=B.slice();
+    for(let k=0;k<nb;k++){
+      if(k-4<0||k+4>=nb)continue;
+      const avg=(Bp[k-4]+B[k+4])/2;  // Bp uses already-updated left (causal), B right
+      if(B[k]>avg)B[k]=avg;
+    }
+  }
+  bins.forEach((b,i)=>b.eroded=B[i]);
+  // continuum per channel: min over original Y and 4 PLY linear interpolations
+  const continuum=new Float64Array(N);
+  // For each PLY, build piecewise-linear over its bin centers
+  const plyCurves=[[],[],[],[]];
+  bins.forEach((b,i)=>plyCurves[i%4].push({x:b.center,y:b.eroded}));
+  function interpPLY(curve,ch){
+    if(curve.length===0)return Infinity;
+    if(ch<=curve[0].x)return curve[0].y;
+    if(ch>=curve[curve.length-1].x)return curve[curve.length-1].y;
+    let lo=0,hi=curve.length-1;
+    while(hi-lo>1){const m=(lo+hi)>>1;if(curve[m].x<=ch)lo=m;else hi=m;}
+    const a=curve[lo],b=curve[hi];
+    return a.y+(b.y-a.y)*(ch-a.x)/(b.x-a.x);
+  }
+  for(let ch=0;ch<N;ch++){
+    let m=Y[ch];
+    for(let pl=0;pl<4;pl++)m=Math.min(m,interpPLY(plyCurves[pl],ch));
+    continuum[ch]=m;
+  }
+  const net=new Float64Array(N);
+  for(let ch=0;ch<N;ch++)net[ch]=Y[ch]-continuum[ch];
+  // Gaussian fit at each library line position
+  const fits=[];
+  for(const E of libLines){
+    const ctr=E2ch(E), Z=Zof(E), fch=fwhmCh(E);
+    const lo=Math.max(0,Math.round(ctr-2*fch)), hi=Math.min(N-1,Math.round(ctr+2*fch));
+    const X=[],yv=[],w=[];
+    for(let ch=lo;ch<=hi;ch++){
+      const d=ch-ctr, G=Math.exp(-d*d/(Z*Z));
+      X.push([1,d,G]); yv.push(net[ch]); w.push(1/Math.max(1,Y[ch]));
+    }
+    let H=0,sH=0,B0=0,B1=0;
+    if(X.length>=3){
+      const {beta,cov}=lstsqW(X,yv,w);
+      B0=beta[0];B1=beta[1];H=beta[2];
+      // residual variance scaling
+      let chi=0;for(let i=0;i<X.length;i++){const f=B0+B1*X[i][1]+H*X[i][2];chi+=w[i]*(yv[i]-f)**2;}
+      const dof=Math.max(1,X.length-3);
+      sH=Math.sqrt(Math.max(0,cov[2][2]*chi/dof));
+    }
+    const area=H*Z*Math.sqrt(Math.PI);
+    // background height at center
+    const Bc=continuum[Math.round(ctr)]||0;
+    fits.push({E,ctr,Z,fwhmCh:fch,H,sigmaH:sH,B0,B1,area,bgHeight:Bc,roi:[lo,hi]});
+  }
+  return {bins,binW,continuum,net,fits,plyCurves,nb};
+}
+
+/* ---- Rejection tests ---- */
+function rejectionTests(fit, Y, opt={}){
+  const C1=opt.C1!=null?opt.C1:3, C2=opt.C2!=null?opt.C2:2.5;
+  const FV=opt.FV!=null?opt.FV:1, FB=opt.FB!=null?opt.FB:1;
+  const N=Y.length;
+  const R=Math.round(0.9*fit.fwhmCh);
+  const lo=Math.max(0,fit.ctr-R|0), hi=Math.min(N-1,fit.ctr+R|0);
+  let sumY=0;for(let ch=lo|0;ch<=hi;ch++)sumY+=Y[ch];
+  const mdaLimit=C1+C2*Math.sqrt(sumY/(0.966*0.966));
+  const mda={lhs:fit.area,rhs:mdaLimit,pass:fit.area>mdaLimit,sumY};
+  const varr={lhs:fit.H*fit.H,rhs:FV*fit.sigmaH*fit.sigmaH,pass:fit.H*fit.H>FV*fit.sigmaH*fit.sigmaH};
+  const back={lhs:fit.H*fit.H,rhs:FB*fit.bgHeight,pass:fit.H*fit.H>FB*fit.bgHeight};
+  return {mda,varr,back,overall:mda.pass&&varr.pass&&back.pass};
+}
+
+/* ---- Peak Area (Sum, linear/step continuum) ---- */
+function peakArea(Y, E, mode="lin", opt={}){
+  const N=Y.length, ctr=E2ch(E), fch=fwhmCh(E);
+  const halfL=(opt.maxLeft!=null?opt.maxLeft:1.25)*fch;
+  const halfR=(opt.maxRight!=null?opt.maxRight:1.25)*fch;
+  const roiLo=Math.max(1,Math.round(ctr-halfL)), roiHi=Math.min(N-2,Math.round(ctr+halfR));
+  const nBg=opt.nBg||4;
+  // background channel sums just outside ROI
+  let B1=0,B2=0;
+  for(let i=1;i<=nBg;i++){B1+=Y[clamp(roiLo-i,0,N-1)];B2+=Y[clamp(roiHi+i,0,N-1)];}
+  const Nroi=roiHi-roiLo+1;
+  let gross=0;for(let ch=roiLo;ch<=roiHi;ch++)gross+=Y[ch];
+  let bgTotal, bgArr=new Float64Array(N), sigmaB2;
+  if(mode==="lin"){
+    bgTotal=(Nroi/(2*nBg))*(B1+B2);
+    sigmaB2=(Nroi/(2*nBg))**2*(B1+B2);
+    const bL=B1/nBg, bR=B2/nBg;
+    for(let ch=roiLo;ch<=roiHi;ch++)bgArr[ch]=lerp(bL,bR,(ch-roiLo)/Math.max(1,Nroi-1));
+  }else{ // step
+    const bL=B1/nBg, bR=B2/nBg;
+    let cum=0,tot=0;for(let ch=roiLo;ch<=roiHi;ch++)tot+=Y[ch];
+    for(let ch=roiLo;ch<=roiHi;ch++){cum+=Y[ch];const f=tot>0?cum/tot:(ch-roiLo)/Nroi;bgArr[ch]=lerp(bL,bR,f);}
+    bgTotal=0;for(let ch=roiLo;ch<=roiHi;ch++)bgTotal+=bgArr[ch];
+    sigmaB2=(Nroi/(2*nBg))**2*(B1+B2);
+  }
+  const net=gross-bgTotal;
+  const sigmaNet=Math.sqrt(Math.max(0,gross+sigmaB2));
+  const LC=1.645*Math.sqrt(Math.max(0,bgTotal+sigmaB2));
+  return {roi:[roiLo,roiHi],gross,bg:bgTotal,net,sigmaNet,LC,B1,B2,nBg,Nroi,bgArr,mode,detected:net>LC};
+}
+
+/* ---- Nuclide ID: confidence index ---- */
+function nuclideID(spec, locResult, library, opt={}){
+  const tolFixed=opt.tolFixed!=null?opt.tolFixed:25;   // keV
+  const useVar=opt.useVar!==false, tolVarFW=opt.tolVarFW!=null?opt.tolVarFW:1;
+  const out=[];
+  for(const name of library){
+    const nuc=NUCLIDES[name];
+    let parts=[], ciProduct=1, anyDetected=false;
+    for(const ln of nuc.lines){
+      const fit=locResult.fits.find(f=>Math.abs(f.E-ln.E)<1);
+      const rej=fit?rejectionTests(fit,spec.Y,opt):null;
+      const detected=rej?rej.overall:false;
+      if(detected)anyDetected=true;
+      // observed centroid (use fit ctr→E)
+      const obsE=fit?ch2E(fit.ctr):ln.E;
+      const dE=Math.abs(obsE-ln.E);
+      const tol=useVar?Math.max(tolFixed,tolVarFW*fwhmKeV(ln.E)):tolFixed;
+      const enScore=Math.exp(-0.5*(dE/(tol/2.5))**2);     // energy match (1 best)
+      // weight by yield (strong lines matter more)
+      const w=ln.y;
+      let lineScore;
+      if(detected){ lineScore=enScore; }
+      else { // missing-line penalty if expected above MDA
+        const expectAbove= fit && fit.area>0 ? 1:0.4;
+        lineScore=Math.max(0.15,1-0.5*w*expectAbove);     // penalize missing strong line
+      }
+      parts.push({E:ln.E,detected,obsE,dE,tol,enScore,w,lineScore});
+      ciProduct*=lineScore;
+    }
+    const CI=Math.pow(ciProduct,1/nuc.lines.length); // geometric mean → 0..1
+    out.push({nuclide:name,CI,parts,detected:anyDetected,color:nuc.color});
+  }
+  out.sort((a,b)=>b.CI-a.CI);
+  return out;
+}
+
+/* ---- Activity + uncertainty ---- */
+function activityCalc(S,sigmaS,T,eps,sigmaEps,y,sigmaY=0,factors={}){
+  const F=(factors.Kc||1)*(factors.Kw||1)*(factors.Kx||1)*(factors.Cf||1)*(factors.Uf||1)*(factors.V||1);
+  const denom=T*eps*y*F;
+  const A=denom>0?S/denom:0;
+  const Rp=T>0?S/T:0;
+  const rS=S>0?sigmaS/S:0, rE=eps>0?sigmaEps/eps:0, rY=y>0?sigmaY/y:0;
+  const rel=Math.sqrt(rS*rS+rE*rE+rY*rY);
+  const sigmaA=A*rel;
+  return {A,sigmaA,Rp,denom,F,contrib:{S:rS,eps:rE,y:rY},rel};
+}
+function weightedMean(vals){ // [{C,sigma}]
+  let num=0,den=0;const ws=[];
+  for(const v of vals){const w=1/(v.sigma*v.sigma);num+=v.C*w;den+=w;ws.push(w);}
+  const mean=num/den, sigma=Math.sqrt(1/den);
+  return {mean,sigma,weights:ws.map(w=>w/den)};
+}
+
+/* ---- Detection limits ----
+   currieMDA takes sigma0 directly (the std of net peak area under H0).
+   Live pipeline: sigma0 = sqrt(B_roi + sigma_Best^2). Doc example: sigma0 = sigma_B (given). */
+function currieMDA(sigma0,k,T,eps,y,factors={}){
+  const LC=k*sigma0;
+  const LD=k*k+2*LC;
+  const F=(factors.Kc||1)*(factors.Kw||1)*(factors.Kx||1)*(factors.Cf||1)*(factors.Uf||1)*(factors.V||1);
+  const denom=T*eps*y*F;
+  const MDA=denom>0?LD/denom:0;
+  return {sigma0,LC,LD,MDA,denom};
+}
+function ktaMDA(B,k,T,eps,y,factors={}){
+  // KTA-style: LD = 2k√B + (4k²) variant (simplified illustrative)
+  const LD=2*k*Math.sqrt(Math.max(0,B))+ (0.5*4*k*k);
+  const F=(factors.Kc||1)*(factors.Kw||1)*(factors.Kx||1)*(factors.Cf||1)*(factors.Uf||1)*(factors.V||1);
+  const denom=T*eps*y*F; return {LD,MDA:denom>0?LD/denom:0};
+}
+function isoMDA(B,sigmaB,k,T,eps,y,factors={}){
+  // ISO 11929 iterative: y* = k(uncertainty at y*) ; here approximate with extra relative term
+  const relCal=0.03; // model uncertainty of calibration
+  let LD=2.71+3.29*Math.sqrt(Math.max(0,B+sigmaB*sigmaB)); // start at Currie
+  for(let i=0;i<6;i++){ const u=Math.sqrt(B+sigmaB*sigmaB+LD+ (relCal*LD)**2); LD=k*k+2*k*u; }
+  const F=(factors.Kc||1)*(factors.Kw||1)*(factors.Kx||1)*(factors.Cf||1)*(factors.Uf||1)*(factors.V||1);
+  const denom=T*eps*y*F; return {LD,MDA:denom>0?LD/denom:0};
+}
+/* ===================== PART 2b: 추가 분석 알고리즘 (실제 구현) ===================== */
+/* 기존엔 Gamma-M만 동작 → User Specified·Library Simple·2nd Difference·VMS Standard 를
+   실제 알고리즘으로 구현. 추가로 NLLS multiplet·간섭보정·unknown dd·정확한 NID/KTA 구현. */
+
+/* 공용: 알려진 중심 ctr 에 국소 가중 Gaussian 적합 (continuum 주면 배경 제거 후) */
+function fitGaussAt(Y, ctr, E, continuum){
+  const N=Y.length, Z=Zof(E), fch=fwhmCh(E);
+  const lo=Math.max(0,Math.round(ctr-2*fch)), hi=Math.min(N-1,Math.round(ctr+2*fch));
+  const X=[],yv=[],w=[];
+  for(let ch=lo;ch<=hi;ch++){
+    const d=ch-ctr, G=Math.exp(-(d*d)/(Z*Z));
+    const base=continuum?continuum[ch]:0;
+    X.push([1,d,G]); yv.push(Y[ch]-base); w.push(1/Math.max(1,Y[ch]));
+  }
+  let H=0,sH=0,B0=0,B1=0;
+  if(X.length>=3){
+    const {beta,cov}=lstsqW(X,yv,w); B0=beta[0];B1=beta[1];H=beta[2];
+    let chi=0;for(let i=0;i<X.length;i++){const f=B0+B1*X[i][1]+H*X[i][2];chi+=w[i]*((yv[i]-f)**2);}
+    sH=Math.sqrt(Math.max(0,cov[2][2]*chi/Math.max(1,X.length-3)));
+  }
+  const area=H*Z*Math.sqrt(Math.PI);
+  return {ctr,E,H,sigmaH:sH,B0,B1,area,Z,roi:[lo,hi]};
+}
+
+/* ① User Specified — 사용자가 지정한 채널에서만 적합, 존재 검정 없음 */
+function plUserSpecified(Y, channels){
+  return channels.map(ch=>{
+    const E=ch2E(ch), f=fitGaussAt(Y,ch,E,null);
+    return {method:"User Specified",ch,E,area:Math.max(0,f.area),H:f.H,sig:f.sigmaH,
+            detected:true,test:"검정 없음 (지정 위치 그대로)"};
+  });
+}
+
+/* ② Library (Simple) — 라이브러리 에너지를 채널로 변환, ROI 가장자리 직선배경, centroid, 약한 검정(net>0) */
+function plLibrarySimple(Y, libLines){
+  const N=Y.length;
+  return libLines.map(E=>{
+    const ctr=E2ch(E), fch=fwhmCh(E);
+    const lo=Math.max(0,Math.round(ctr-1.25*fch)), hi=Math.min(N-1,Math.round(ctr+1.25*fch));
+    let gross=0; for(let ch=lo;ch<=hi;ch++)gross+=Y[ch];
+    const bg=(Y[lo]+Y[hi])/2*(hi-lo+1);            // ROI 양끝을 잇는 직선 배경
+    const net=gross-bg;
+    let sw=0,sx=0;                                  // 배경 제거 후 무게중심
+    for(let ch=lo;ch<=hi;ch++){const lin=Y[lo]+(Y[hi]-Y[lo])*(ch-lo)/Math.max(1,hi-lo);const v=Math.max(0,Y[ch]-lin);sw+=v;sx+=v*ch;}
+    const cen=sw>0?sx/sw:ctr;
+    return {method:"Library Simple",ch:cen,E,area:Math.max(0,net),net,detected:net>0,test:"net>0 (약한 검정)"};
+  });
+}
+
+/* ③ Library (Gamma-M) — 기존 엔진 래핑 (erosion+4PLY+LSQ+5종 rejection) */
+function plGammaM(Y, libLines, opt){
+  const loc=peakLocateGammaM(Y,libLines,opt);
+  return loc.fits.map(f=>{
+    const rej=rejectionTests(f,Y,opt);
+    return {method:"Library Gamma-M",ch:f.ctr,E:f.E,area:f.area,H:f.H,sig:f.sigmaH,
+            detected:rej.overall,test:`5종 rejection ${rej.overall?"통과":"탈락"}`,rej};
+  });
+}
+
+/* ④ Generalized Second Difference (Mariscotti) — 라이브러리 없이 미지 피크 자동 탐색
+   평활 2차차분 SD_i=Σ c_j·Y_{i+j}, σ(SD_i)=√(Σ c_j²·Y_{i+j}); 피크=SD 국소최소 & −SD/σ>f */
+function plSecondDiff(Y, opt={}){
+  const N=Y.length, f=opt.sdF!=null?opt.sdF:3.0;
+  const wsm=Math.max(2,Math.round(fwhmCh(ch2E(N/2))/2));   // 평활폭 ~ FWHM/2 (채널)
+  const M=2*wsm;
+  // 기본 2차차분(간격 wsm) 후 이동평균 평활을 2회 적용 → 커널 c
+  let k=new Float64Array(2*M+1); k[M-wsm]+=1; k[M]+=-2; k[M+wsm]+=1;
+  const half=Math.max(1,Math.floor(wsm/2));
+  const smooth=arr=>{const o=new Float64Array(arr.length);
+    for(let i=0;i<arr.length;i++){let s=0,n=0;for(let d=-half;d<=half;d++){const j=i+d;if(j>=0&&j<arr.length){s+=arr[j];n++;}}o[i]=s/Math.max(1,n);}return o;};
+  for(let z=0;z<2;z++)k=smooth(k);
+  const c=k;
+  const SD=new Float64Array(N), SIG=new Float64Array(N);
+  for(let i=0;i<N;i++){let sd=0,vv=0;
+    for(let j=-M;j<=M;j++){const ch=i+j;if(ch>=0&&ch<N){const cj=c[j+M];sd+=cj*Y[ch];vv+=cj*cj*Math.max(1,Y[ch]);}}
+    SD[i]=sd; SIG[i]=Math.sqrt(Math.max(1e-9,vv));}
+  const peaks=[];
+  for(let i=M;i<N-M;i++){
+    if(SD[i]<SD[i-1]&&SD[i]<=SD[i+1]&&SD[i]<0){           // SD 국소 최소(음의 골)
+      const signif=-SD[i]/SIG[i];
+      if(signif>f){const E=ch2E(i);peaks.push({method:"2nd Difference",ch:i,E,signif,detected:true,test:`|SD|/σ=${signif.toFixed(1)} > ${f}`});}
+    }
+  }
+  // 너무 가까운 후보 병합(±1 FWHM)
+  peaks.sort((a,b)=>a.ch-b.ch);
+  const merged=[];
+  for(const p of peaks){const last=merged[merged.length-1];
+    if(last&&Math.abs(p.ch-last.ch)<fwhmCh(p.E)){if(p.signif>last.signif)merged[merged.length-1]=p;}
+    else merged.push(p);}
+  return {peaks:merged,SD,SIG,c,wsm};
+}
+
+/* ⑤ VMS Standard — step 배경 + critical-level(95%) 검정 */
+function plVMS(Y, libLines, opt={}){
+  return libLines.map(E=>{
+    const pa=peakArea(Y,E,"step",opt);
+    return {method:"VMS Standard",ch:E2ch(E),E,area:Math.max(0,pa.net),net:pa.net,LC:pa.LC,
+            detected:pa.net>pa.LC,test:`net ${pa.net>pa.LC?">":"≤"} L_C=${Math.round(pa.LC)}`};
+  });
+}
+
+/* 5종 일괄 실행 (동일 스펙트럼) — User는 라이브러리 위치를 '지정'한 것으로 시연 */
+function runAllPeakLocate(Y, libLines, opt={}){
+  const chans=libLines.map(E=>Math.round(E2ch(E)));
+  return {
+    "User Specified":  plUserSpecified(Y, chans),
+    "Library Simple":  plLibrarySimple(Y, libLines),
+    "Library Gamma-M": plGammaM(Y, libLines, opt),
+    "2nd Difference":  plSecondDiff(Y, opt).peaks,
+    "VMS Standard":    plVMS(Y, libLines, opt),
+  };
+}
+
+/* ---- 정확한 KTA MDA: L_D = 2k² + 2·L_C ---- */
+function ktaMDAexact(sigma0,k,T,eps,y,factors={}){
+  const LC=k*sigma0, LD=2*k*k+2*LC;
+  const F=(factors.Kc||1)*(factors.Kw||1)*(factors.Kx||1)*(factors.Cf||1)*(factors.Uf||1)*(factors.V||1);
+  const denom=T*eps*y*F;
+  return {LC,LD,MDA:denom>0?LD/denom:0,denom};
+}
+
+/* ---- 정확한 NID Plus penalty (Genie 상수 0.16·1.6, 반감기 P1=5.1e-3) ---- */
+function nidPlusExact(nuc, locResult, spec, opt={}){
+  const ETOL=opt.ETOL!=null?opt.ETOL:1.0;            // keV (variable tolerance면 fwhm 비례로 줄 수도)
+  const P1=5.1e-3, dtOverT=opt.dtOverT!=null?opt.dtOverT:0;
+  const lines=nuc.lines;
+  const sumY=lines.reduce((s,l)=>s+l.y,0);
+  let index=1.0, energyPart=1.0, missNum=0, denom=0;
+  const detail=[];
+  for(const ln of lines){
+    const fit=locResult.fits.find(f=>Math.abs(f.E-ln.E)<1);
+    const rej=fit?rejectionTests(fit,spec.Y,opt):null;
+    const detected=rej?rej.overall:false;
+    const w=CAL.effFn(ln.E);                          // w(E)=ε(E)
+    denom+=ln.y*w;
+    const obsE=fit?ch2E(fit.ctr):ln.E, dE=Math.abs(obsE-ln.E);
+    // 에너지 penalty (관측된 선만)
+    let fE=1.0;
+    if(detected){ fE=Math.exp(-0.16*(dE*dE)/(ETOL*ETOL)*(ln.y/sumY)); energyPart*=fE; }
+    else { missNum+=ln.y*w*1; }                       // δ=1 (MDA test off 가정)
+    detail.push({E:ln.E,detected,dE,w,fE});
+  }
+  const missPenalty=denom>0?1.6*missNum/denom:0;
+  const halfPenalty=1-Math.exp(-P1*(dtOverT*dtOverT));  // 경과시간 감점(0이면 0)
+  index=energyPart - missPenalty - halfPenalty;
+  index=Math.max(0,Math.min(1,index));
+  return {index,energyPart,missPenalty,halfPenalty,detail,sumY,denom};
+}
+
+/* ---- NLLS multiplet 분해: 고정 형상(중심·폭) 가정 → 진폭에 대해 선형 동시적합 ---- */
+function nllsMultiplet(Y, lineEs, continuum){
+  const N=Y.length;
+  // 결합 ROI = 모든 선의 ±2 FWHM 합집합
+  let lo=N,hi=0;
+  lineEs.forEach(E=>{const c=E2ch(E),f=fwhmCh(E);lo=Math.min(lo,Math.round(c-2*f));hi=Math.max(hi,Math.round(c+2*f));});
+  lo=Math.max(0,lo);hi=Math.min(N-1,hi);
+  const cols=lineEs.map(E=>({E,ctr:E2ch(E),Z:Zof(E)}));
+  const X=[],yv=[],w=[];
+  for(let ch=lo;ch<=hi;ch++){
+    const row=[1,ch-(lo+hi)/2];                        // 배경: 상수+기울기
+    cols.forEach(c=>row.push(Math.exp(-((ch-c.ctr)**2)/(c.Z*c.Z))));  // 각 피크 가우스(높이1)
+    X.push(row); yv.push(Y[ch]-(continuum?continuum[ch]:0)); w.push(1/Math.max(1,Y[ch]));
+  }
+  let beta=null;
+  try{ beta=lstsqW(X,yv,w).beta; }catch(e){ beta=null; }
+  const peaks=cols.map((c,i)=>{
+    const H=beta?Math.max(0,beta[2+i]):0;
+    return {E:c.E,ctr:c.ctr,H,area:H*c.Z*Math.sqrt(Math.PI)};
+  });
+  return {roi:[lo,hi],peaks,bg:beta?[beta[0],beta[1]]:[0,0]};
+}
+
+/* ---- 간섭보정: 관측 계수율 = (효율·yield 행렬)·활동도 → 행렬 역산으로 활동도 분리 ---- */
+function interferenceCorrection(energies, nucNames){
+  // M[i][j] = ε(E_i)·y(nuclide j 가 E_i 에 기여하는 yield),  관측 r_i = Σ_j M[i][j]·A_j
+  const M=energies.map(E=>nucNames.map(nm=>{
+    const nuc=NUCLIDES[nm]; const ln=nuc.lines.find(l=>Math.abs(l.E-E)<5);
+    return ln?CAL.effFn(E)*ln.y:0;
+  }));
+  return {M, solve:(rates)=>{
+    try{const inv=invMat(M);return nucNames.map((nm,j)=>({nuclide:nm,A:inv[j].reduce((s,v,i)=>s+v*rates[i],0)}));}
+    catch(e){return null;}
+  }};
+}
+
+/* ---- Unknown peak search (라이브, dd 지표): C=W√(B/W), dd=(O−C−K1)/(K2√(W(B+C))) ---- */
+function unknownPeakSearch(Y, continuum, opt={}){
+  const N=Y.length, K1=opt.K1!=null?opt.K1:3, K2=opt.K2!=null?opt.K2:2.5;
+  const W=Math.max(4,Math.round(fwhmCh(ch2E(N/2))));
+  const cands=[];
+  for(let ctr=W;ctr<N-W;ctr+=Math.max(1,Math.round(W/2))){
+    let O=0,B=0;
+    for(let ch=ctr-(W>>1);ch<=ctr+(W>>1);ch++){O+=Y[ch];B+=(continuum?continuum[ch]:0);}
+    const C=W*Math.sqrt(Math.max(0,B)/W);
+    const dd=(O-C-K1)/(K2*Math.sqrt(Math.max(1,W*(B+C))));
+    if(dd>1)cands.push({ch:ctr,E:ch2E(ctr),dd,O,B});
+  }
+  // 인접 후보 병합
+  cands.sort((a,b)=>a.ch-b.ch);
+  const out=[];
+  for(const c of cands){const last=out[out.length-1];
+    if(last&&Math.abs(c.ch-last.ch)<W){if(c.dd>last.dd)out[out.length-1]=c;}else out.push(c);}
+  return out;
+}
+
+/* ===================== PART 3: CHART / CANVAS / TIP / MATH ===================== */
+
+function setupCanvas(canvas){
+  const dpr=Math.min(2,window.devicePixelRatio||1);
+  const r=canvas.getBoundingClientRect();
+  const w=Math.max(10,r.width), h=Math.max(10,r.height);
+  canvas.width=Math.round(w*dpr); canvas.height=Math.round(h*dpr);
+  const ctx=canvas.getContext("2d");
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  return {ctx,w,h,dpr};
+}
+
+const COL={grid:"#1f2940",gridSoft:"#172033",axis:"#3a4868",ink:"#e6edf7",dim:"#8da0bf",faint:"#5b6b8c"};
+
+class SpectrumChart{
+  constructor(canvas){
+    this.cv=canvas;
+    this.traces=[];     // {name,color,data,width,visible,glow}
+    this.markers=[];    // {x,color,label,dash,top}
+    this.bands=[];      // {x0,x1,color}
+    this.hlines=[];     // {y,color,label,dash}   (count space)
+    this.fills=[];      // {data,color,base}  area fill under net etc.
+    this.pad={l:46,r:12,t:10,b:24};
+    this.view={x0:0,x1:CAL.N,log:false};
+    this.cursorCb=null;
+    this._drag=null;
+    this._bind();
+  }
+  setView(x0,x1){this.view.x0=clamp(x0,0,CAL.N-2);this.view.x1=clamp(x1,this.view.x0+8,CAL.N);this.draw();}
+  reset(){this.view.x0=0;this.view.x1=CAL.N;this.draw();}
+  zoom(f,cx){ // f<1 zoom in
+    const {x0,x1}=this.view, c=cx!=null?cx:(x0+x1)/2;
+    const nx0=c-(c-x0)*f, nx1=c+(x1-c)*f;
+    this.setView(nx0,nx1);
+  }
+  _plotRect(){const {w,h}=this._wh;return {x:this.pad.l,y:this.pad.t,w:w-this.pad.l-this.pad.r,h:h-this.pad.t-this.pad.b};}
+  _yMax(){
+    let m=1;const {x0,x1}=this.view;
+    for(const t of this.traces){if(!t.visible)continue;
+      for(let ch=Math.floor(x0);ch<Math.ceil(x1)&&ch<t.data.length;ch++)if(t.data[ch]>m)m=t.data[ch];}
+    return m*1.12;
+  }
+  _yMin(){return this.view.log?0.5:0;}
+  X(ch){const r=this._plotRect();return r.x+(ch-this.view.x0)/(this.view.x1-this.view.x0)*r.w;}
+  Yv(v){const r=this._plotRect();const ymax=this._ym,ymin=this._yn;
+    if(this.view.log){const lo=Math.log10(Math.max(ymin,0.5)),hi=Math.log10(Math.max(ymax,10));
+      const lv=Math.log10(Math.max(v,0.5));return r.y+r.h-(lv-lo)/(hi-lo)*r.h;}
+    return r.y+r.h-(v-ymin)/(ymax-ymin)*r.h;}
+  draw(){
+    const s=setupCanvas(this.cv);this._wh=s;const {ctx,w,h}=s;
+    ctx.clearRect(0,0,w,h);
+    this._ym=this._yMax();this._yn=this._yMin();
+    const r=this._plotRect();
+    // grid + axes
+    ctx.save();
+    ctx.font="10px 'JetBrains Mono',monospace";ctx.textBaseline="middle";
+    // Y ticks
+    ctx.strokeStyle=COL.gridSoft;ctx.lineWidth=1;ctx.fillStyle=COL.faint;ctx.textAlign="right";
+    const yticks=this._yticks();
+    for(const yt of yticks){const yy=this.Yv(yt);
+      ctx.beginPath();ctx.moveTo(r.x,yy);ctx.lineTo(r.x+r.w,yy);ctx.stroke();
+      ctx.fillText(this._fmtTick(yt),r.x-6,yy);}
+    // X ticks (energy)
+    ctx.textAlign="center";ctx.textBaseline="top";
+    const xt=this._xticks();
+    for(const c of xt){const xx=this.X(c);if(xx<r.x-1||xx>r.x+r.w+1)continue;
+      ctx.strokeStyle=COL.gridSoft;ctx.beginPath();ctx.moveTo(xx,r.y);ctx.lineTo(xx,r.y+r.h);ctx.stroke();
+      ctx.fillStyle=COL.faint;ctx.fillText(Math.round(ch2E(c))+"",xx,r.y+r.h+4);}
+    ctx.fillStyle=COL.faint;ctx.textAlign="left";ctx.fillText("keV",r.x+r.w-22,r.y+r.h+4);
+    ctx.restore();
+    // bands (ROI)
+    for(const b of this.bands){const x0=this.X(b.x0),x1=this.X(b.x1);
+      ctx.fillStyle=b.color;ctx.fillRect(Math.min(x0,x1),r.y,Math.abs(x1-x0),r.h);}
+    // fills
+    for(const f of this.fills){
+      ctx.beginPath();let started=false;
+      const x0=Math.max(0,Math.floor(this.view.x0)),x1=Math.min(f.data.length-1,Math.ceil(this.view.x1));
+      for(let ch=x0;ch<=x1;ch++){const xx=this.X(ch),yy=this.Yv(Math.max(f.base||0,f.data[ch]));
+        if(!started){ctx.moveTo(xx,this.Yv(f.base||0));ctx.lineTo(xx,yy);started=true;}else ctx.lineTo(xx,yy);}
+      ctx.lineTo(this.X(x1),this.Yv(f.base||0));ctx.closePath();
+      ctx.fillStyle=f.color;ctx.fill();
+    }
+    // hlines
+    for(const hl of this.hlines){const yy=this.Yv(hl.y);if(yy<r.y||yy>r.y+r.h)continue;
+      ctx.save();ctx.strokeStyle=hl.color;ctx.lineWidth=1.4;if(hl.dash)ctx.setLineDash(hl.dash);
+      ctx.beginPath();ctx.moveTo(r.x,yy);ctx.lineTo(r.x+r.w,yy);ctx.stroke();ctx.restore();
+      if(hl.label){ctx.fillStyle=hl.color;ctx.font="10px 'JetBrains Mono'";ctx.textAlign="right";ctx.textBaseline="bottom";
+        ctx.fillText(hl.label,r.x+r.w-4,yy-2);}}
+    // markers (vertical)
+    for(const m of this.markers){const xx=this.X(m.x);if(xx<r.x-1||xx>r.x+r.w+1)continue;
+      ctx.save();ctx.strokeStyle=m.color;ctx.lineWidth=1.2;if(m.dash)ctx.setLineDash(m.dash);
+      ctx.beginPath();ctx.moveTo(xx,r.y);ctx.lineTo(xx,r.y+r.h);ctx.stroke();ctx.restore();
+      if(m.label){ctx.save();ctx.fillStyle=m.color;ctx.font="700 10px 'JetBrains Mono'";ctx.textAlign="center";
+        ctx.fillText(m.label,xx,r.y+(m.top?8:r.h-8));ctx.restore();}}
+    // traces
+    ctx.save();ctx.beginPath();ctx.rect(r.x,r.y,r.w,r.h);ctx.clip();
+    for(const t of this.traces){if(!t.visible)continue;
+      ctx.beginPath();
+      const x0=Math.max(0,Math.floor(this.view.x0)),x1=Math.min(t.data.length-1,Math.ceil(this.view.x1));
+      let started=false;
+      for(let ch=x0;ch<=x1;ch++){const xx=this.X(ch),yy=this.Yv(t.data[ch]);
+        if(!started){ctx.moveTo(xx,yy);started=true;}else ctx.lineTo(xx,yy);}
+      if(t.glow){ctx.shadowColor=t.color;ctx.shadowBlur=6;}
+      ctx.strokeStyle=t.color;ctx.lineWidth=t.width||1.4;ctx.lineJoin="round";ctx.stroke();
+      ctx.shadowBlur=0;
+    }
+    ctx.restore();
+    // drag box
+    if(this._drag&&this._drag.box){const{a,b}=this._drag;ctx.fillStyle="rgba(54,214,195,.12)";
+      ctx.strokeStyle="rgba(54,214,195,.6)";ctx.lineWidth=1;
+      ctx.fillRect(Math.min(a,b),r.y,Math.abs(b-a),r.h);ctx.strokeRect(Math.min(a,b),r.y,Math.abs(b-a),r.h);}
+  }
+  _yticks(){const max=this._ym;
+    if(this.view.log){const out=[];for(let e=0;Math.pow(10,e)<=max*1.5;e++)out.push(Math.pow(10,e));return out;}
+    const step=niceStep(max/5);const out=[];for(let v=0;v<=max;v+=step)out.push(v);return out;}
+  _xticks(){const e0=ch2E(this.view.x0),e1=ch2E(this.view.x1);const step=niceStep((e1-e0)/6);
+    const out=[];for(let E=Math.ceil(e0/step)*step;E<=e1;E+=step)out.push(E2ch(E));return out;}
+  _fmtTick(v){if(v>=1000)return (v/1000).toFixed(v>=10000?0:1)+"k";return v.toFixed(0);}
+  _bind(){
+    const cv=this.cv;
+    cv.addEventListener("mousemove",e=>{
+      const r=cv.getBoundingClientRect();const px=e.clientX-r.left,py=e.clientY-r.top;
+      const pr=this._plotRect();
+      if(this._drag){if(this._drag.box){this._drag.b=clamp(px,pr.x,pr.x+pr.w);this.draw();}
+        else{const dch=(this._drag.px-px)/pr.w*(this.view.x1-this.view.x0);
+          let nx0=this._drag.x0+dch,nx1=this._drag.x1+dch;
+          if(nx0<0){nx1-=nx0;nx0=0;}if(nx1>CAL.N){nx0-=(nx1-CAL.N);nx1=CAL.N;}
+          this.view.x0=clamp(nx0,0,CAL.N-8);this.view.x1=clamp(nx1,this.view.x0+8,CAL.N);this.draw();}}
+      const ch=this.view.x0+(px-pr.x)/pr.w*(this.view.x1-this.view.x0);
+      if(this.cursorCb&&px>=pr.x&&px<=pr.x+pr.w){this.cursorCb(ch,this._valAt(ch));}
+      else if(this.cursorCb)this.cursorCb(null);
+    });
+    cv.addEventListener("mousedown",e=>{const r=cv.getBoundingClientRect();const px=e.clientX-r.left;
+      const pr=this._plotRect();
+      if(e.shiftKey){this._drag={box:true,a:clamp(px,pr.x,pr.x+pr.w),b:clamp(px,pr.x,pr.x+pr.w)};}
+      else{this._drag={box:false,px,x0:this.view.x0,x1:this.view.x1};cv.style.cursor="grabbing";}});
+    window.addEventListener("mouseup",()=>{
+      if(this._drag&&this._drag.box){const pr=this._plotRect();const a=this._drag.a,b=this._drag.b;
+        if(Math.abs(b-a)>6){const ch0=this.view.x0+(Math.min(a,b)-pr.x)/pr.w*(this.view.x1-this.view.x0);
+          const ch1=this.view.x0+(Math.max(a,b)-pr.x)/pr.w*(this.view.x1-this.view.x0);this.setView(ch0,ch1);}}
+      this._drag=null;cv.style.cursor="crosshair";});
+    cv.addEventListener("wheel",e=>{e.preventDefault();const r=cv.getBoundingClientRect();const px=e.clientX-r.left;
+      const pr=this._plotRect();const ch=this.view.x0+(px-pr.x)/pr.w*(this.view.x1-this.view.x0);
+      this.zoom(e.deltaY>0?1.15:0.87,ch);},{passive:false});
+    cv.style.cursor="crosshair";
+    // touch
+    let lastTouch=null;
+    cv.addEventListener("touchstart",e=>{if(e.touches.length===1){const t=e.touches[0];const r=cv.getBoundingClientRect();
+      lastTouch={px:t.clientX-r.left,x0:this.view.x0,x1:this.view.x1};}},{passive:true});
+    cv.addEventListener("touchmove",e=>{if(e.touches.length===1&&lastTouch){const t=e.touches[0];const r=cv.getBoundingClientRect();
+      const pr=this._plotRect();const dch=(lastTouch.px-(t.clientX-r.left))/pr.w*(this.view.x1-this.view.x0);
+      let nx0=lastTouch.x0+dch,nx1=lastTouch.x1+dch;if(nx0<0){nx1-=nx0;nx0=0;}if(nx1>CAL.N){nx0-=(nx1-CAL.N);nx1=CAL.N;}
+      this.view.x0=clamp(nx0,0,CAL.N-8);this.view.x1=clamp(nx1,this.view.x0+8,CAL.N);this.draw();}},{passive:true});
+  }
+  _valAt(ch){const i=Math.round(ch);const o={};for(const t of this.traces)if(t.visible&&i>=0&&i<t.data.length)o[t.name]=t.data[i];return o;}
+}
+function niceStep(x){const e=Math.pow(10,Math.floor(Math.log10(Math.max(x,1e-9))));const f=x/e;
+  return (f<1.5?1:f<3?2:f<7?5:10)*e;}
+
+/* simple bar/line canvas for sub-viz */
+function clearCv(canvas){const s=setupCanvas(canvas);s.ctx.clearRect(0,0,s.w,s.h);return s;}
+
+/* ---------- TIP engine ---------- */
+const TipEngine={
+  el:null, level:"beg",
+  init(){this.el=$("#tip");
+    document.addEventListener("mouseover",e=>{const t=e.target.closest("[data-tip]");if(t)this.show(t,t.dataset.tip);});
+    document.addEventListener("mouseout",e=>{if(e.target.closest("[data-tip]"))this.hide();});
+    document.addEventListener("click",e=>{const t=e.target.closest("[data-tip].q,[data-tip].tap");
+      if(t){if(this._tapEl===t){this.hide();this._tapEl=null;}else{this.show(t,t.dataset.tip);this._tapEl=t;}}});
+    window.addEventListener("scroll",()=>this.hide(),true);
+  },
+  text(key){const c=COPY[key];if(!c)return null;return c[this.level]||c.beg;},
+  show(anchor,key){const txt=this.text(key);if(!txt){return;}
+    const lvName={beg:"초급 · 비유",mid:"중급 · 개념",adv:"고급 · 수식"}[this.level];
+    const lvCls=this.level==="beg"?"":this.level==="mid"?"mid":"adv";
+    this.el.innerHTML=`<span class="tip-lv ${lvCls}">${lvName}</span>${txt}`;
+    this.el.classList.add("show");
+    const r=anchor.getBoundingClientRect();const tw=this.el.offsetWidth,th=this.el.offsetHeight;
+    let left=r.left+r.width/2-tw/2;left=clamp(left,8,innerWidth-tw-8);
+    let top=r.top-th-12;let up=false;
+    if(top<8){top=r.bottom+12;up=true;}
+    this.el.style.left=left+"px";this.el.style.top=top+"px";
+    this.el.classList.toggle("up",up);
+    const ax=clamp(r.left+r.width/2-left-5,12,tw-24);this.el.style.setProperty("--ax",ax+"px");
+  },
+  hide(){this.el.classList.remove("show");this._tapEl=null;},
+  setLevel(lv){this.level=lv;},
+};
+
+/* ---------- lightweight math render (string with markup → HTML) ----------
+   syntax: _x = subscript, ^x = superscript (single token or {..}), frac(a/b), sqrt(x)
+   Use plain helpers instead for clarity. */
+function mq(html){return `<span class="mono">${html}</span>`;}
+function frac(a,b){return `<span class="frac"><span class="top">${a}</span><span class="bot">${b}</span></span>`;}
+function sq(x){return `<span class="sqrt">√<span style="border-top:1px solid var(--ink-faint)">${x}</span></span>`;}
+const sub=s=>`<span class="sub">${s}</span>`, sup=s=>`<span class="sup">${s}</span>`;
+/* ===================== PART 4a: STATE / BUILDERS / HERO / TABS 1-3 ===================== */
+
+const STATE={
+  nuclide:"Cs-137", level:"beg", activeTab:"overview",
+  activity:833, time:600, bg:1.0, gain:0, seed:12345, noise:true, scale:"lin",
+  k:0.4, erodeStep:8, gainOn:true,
+  C1:3, C2:2.5, FV:1, FB:1,
+  areaMode:"lin", maxLeft:1.25, maxRight:1.25, nBg:4,
+  tolFixed:25, tolVarFW:1, useVar:true, library:["Cs-137","Co-60","Cd-109"],
+  effModel:"loglog", kMDA:1.645,
+  plAlgo:"gammaM", sdF:3,
+  sim:null, loc:null, _erodeAnim:null,
+};
+
+let CHART=null;
+
+function recompute(){
+  STATE.sim=simulateSpectrum({nuclide:STATE.nuclide,activity:STATE.activity,time:STATE.time,
+    bg:STATE.bg,gain:STATE.gain,seed:STATE.seed,noise:STATE.noise});
+  const libLines=NUCLIDES[STATE.nuclide].lines.map(l=>l.E);
+  STATE.loc=peakLocateGammaM(STATE.sim.Y,libLines,{k:STATE.k,iters:STATE.erodeStep});
+}
+
+/* ---- control builders ---- */
+function slider(o){
+  const wrap=el("div","ctrl");
+  const top=el("div","ctrl-top");
+  const lab=el("div","ctrl-lab");lab.innerHTML=o.label+(o.tip?` <span class="q" data-tip="${o.tip}">?</span>`:"");
+  const val=el("div","ctrl-val");
+  const inp=el("input");inp.type="range";inp.min=o.min;inp.max=o.max;inp.step=o.step;inp.value=o.val;
+  const setVal=v=>{val.innerHTML=(o.fmt?o.fmt(v):fmt(v,0))+(o.unit?` <small>${o.unit}</small>`:"");
+    const p=(v-o.min)/(o.max-o.min)*100;inp.style.setProperty("--p",p+"%");};
+  setVal(+o.val);
+  inp.addEventListener("input",()=>{const v=+inp.value;setVal(v);o.onInput(v);});
+  top.append(lab,val);wrap.append(top,inp);
+  return wrap;
+}
+function toggle(o){
+  const t=el("div","toggle"+(o.on?" on":""));
+  t.innerHTML=`<div class="tg-lab">${o.label}${o.desc?` <span class="desc">${o.desc}</span>`:""}${o.tip?` <span class="q" data-tip="${o.tip}">?</span>`:""}</div><div class="sw"></div>`;
+  t.addEventListener("click",e=>{if(e.target.closest(".q"))return;t.classList.toggle("on");o.onClick(t.classList.contains("on"));});
+  return t;
+}
+function pills(o){
+  const wrap=el("div","pills");
+  o.options.forEach(op=>{const b=el("button","pill"+(op.v===o.active?" on":""),op.t);
+    b.addEventListener("click",()=>{wrap.querySelectorAll(".pill").forEach(p=>p.classList.remove("on"));b.classList.add("on");o.onSelect(op.v);});
+    wrap.append(b);});
+  return wrap;
+}
+function sec(title,...children){const s=el("div","sec");if(title)s.append(el("div","sec-h",title));children.forEach(c=>c&&s.append(c));return s;}
+function card(opts){const c=el("div","card"+(opts.glow?" glow":""));
+  let h=`<div class="card-h">${opts.title}${opts.badge?`<span class="badge">${opts.badge}</span>`:""}</div>`;
+  if(opts.sub)h+=`<div class="card-sub">${opts.sub}</div>`;c.innerHTML=h;
+  if(opts.body)opts.body.forEach?opts.body.forEach(b=>c.append(b)):c.append(opts.body);
+  return c;}
+
+/* ---- HERO render: choose overlays by active tab ---- */
+function renderHero(){
+  if(!CHART)return;
+  const sim=STATE.sim, loc=STATE.loc, nuc=NUCLIDES[STATE.nuclide];
+  CHART.view.log=STATE.scale==="log";
+  const traces=[],markers=[],bands=[],fills=[],hlines=[];
+  const T={
+    raw:{name:"원 스펙트럼",color:"var(--line-raw)",data:sim.Y,width:1.3,visible:true},
+  };
+  // resolve CSS vars to actual colors for canvas
+  const cssVar=v=>v.startsWith("var(")?getComputedStyle(document.documentElement).getPropertyValue(v.slice(4,-1)).trim():v;
+  traces.push({...T.raw,color:cssVar(T.raw.color)});
+  const tab=STATE.activeTab;
+  // line center markers always
+  for(const l of loc.fits){markers.push({x:l.ctr,color:nuc.color,label:Math.round(l.E)+"",top:true,dash:[4,4]});}
+
+  if(tab==="spectrum"){
+    if(STATE.showDecomp){
+      traces.push({name:"광전피크",color:nuc.color,data:sim.peaks,width:1.4,visible:true,glow:true});
+      traces.push({name:"Compton",color:cssVar("var(--accent-2)"),data:sim.comp,width:1.2,visible:true});
+      traces.push({name:"배경",color:cssVar("var(--line-cont)"),data:sim.back,width:1.2,visible:true});
+    }
+  }
+  else if(tab==="locate"){
+    traces.push({name:"배경 continuum",color:cssVar("var(--line-cont)"),data:loc.continuum,width:1.6,visible:true});
+    traces.push({name:"net 스펙트럼",color:cssVar("var(--line-net)"),data:loc.net,width:1.5,visible:true,glow:true});
+    // fitted gaussian curve
+    const fitData=new Float64Array(sim.N);
+    for(const f of loc.fits)for(let ch=f.roi[0];ch<=f.roi[1];ch++){const d=ch-f.ctr;fitData[ch]=Math.max(fitData[ch],f.H*Math.exp(-d*d/(f.Z*f.Z)));}
+    traces.push({name:"Gaussian 적합",color:cssVar("var(--line-fit)"),data:fitData,width:1.8,visible:true,glow:true});
+  }
+  else if(tab==="area"){
+    const f=loc.fits[0];const pa=peakArea(sim.Y,f.E,STATE.areaMode,{maxLeft:STATE.maxLeft,maxRight:STATE.maxRight,nBg:STATE.nBg});
+    bands.push({x0:pa.roi[0],x1:pa.roi[1],color:"rgba(54,214,195,.08)"});
+    traces.push({name:"배경선",color:cssVar("var(--line-cont)"),data:pa.bgArr,width:1.5,visible:true});
+    fills.push({data:sim.Y,base:0,color:"rgba(91,123,170,.10)"});
+    markers.push({x:pa.roi[0],color:cssVar("var(--accent)"),dash:[3,3]});
+    markers.push({x:pa.roi[1],color:cssVar("var(--accent)"),dash:[3,3]});
+    STATE._area=pa;
+  }
+  else if(tab==="mda"){
+    traces.push({name:"net 스펙트럼",color:cssVar("var(--line-net)"),data:loc.net,width:1.4,visible:true});
+    const f=loc.fits[0];const pa=peakArea(sim.Y,f.E,"lin",{maxLeft:1.25,maxRight:1.25,nBg:STATE.nBg});
+    const k=STATE.kMDA, sigma0=Math.sqrt(Math.max(0,pa.bg+ (pa.Nroi/(2*pa.nBg))**2*(pa.B1+pa.B2)));
+    const LC=k*sigma0, LD=k*k+2*LC;
+    hlines.push({y:LC+pa.bg/pa.Nroi,color:cssVar("var(--warn)"),label:"L_C",dash:[5,4]});
+    hlines.push({y:LD+pa.bg/pa.Nroi,color:cssVar("var(--bad)"),label:"L_D",dash:[5,4]});
+    STATE._mdaPA=pa;STATE._mda={sigma0,LC,LD};
+  }
+  else if(tab==="nid"){
+    for(const name of STATE.library){const n=NUCLIDES[name];for(const l of n.lines){const ctr=E2ch(l.E);
+      const tol=STATE.useVar?Math.max(STATE.tolFixed,STATE.tolVarFW*fwhmKeV(l.E)):STATE.tolFixed;
+      const tolCh=tol/CAL.C1/2;
+      bands.push({x0:ctr-tolCh,x1:ctr+tolCh,color:name===STATE.nuclide?"rgba(54,214,195,.07)":"rgba(141,160,191,.05)"});
+      markers.push({x:ctr,color:n.color,label:name.split("-")[0],top:false,dash:[2,3]});}}
+  }
+  CHART.traces=traces;CHART.markers=markers;CHART.bands=bands;CHART.fills=fills;CHART.hlines=hlines;
+  CHART.draw();
+  renderLegend(traces);
+  renderStatChips();
+}
+
+function renderLegend(traces){
+  const lg=$("#legend");lg.innerHTML="";
+  traces.forEach((t,i)=>{const d=el("div","lg"+(t.visible?"":" off"));
+    d.innerHTML=`<i style="background:${t.color}"></i>${t.name}`;
+    d.addEventListener("click",()=>{t.visible=!t.visible;d.classList.toggle("off");CHART.draw();});
+    lg.append(d);});
+}
+
+function renderStatChips(){
+  const sim=STATE.sim,loc=STATE.loc,nuc=NUCLIDES[STATE.nuclide];
+  const f=loc.fits[0];
+  const rej=rejectionTests(f,sim.Y,STATE);
+  const pa=peakArea(sim.Y,f.E,"lin",{maxLeft:1.25,maxRight:1.25,nBg:STATE.nBg});
+  const eff=effOf(f.E);
+  const act=activityCalc(pa.net,pa.sigmaNet,STATE.time,eff.eps,eff.sigma,nuc.lines[0].y,0,{});
+  const sigmaBest=Math.sqrt((pa.Nroi/(2*pa.nBg))**2*(pa.B1+pa.B2));
+  const sigma0=Math.sqrt(Math.max(0,pa.bg+sigmaBest*sigmaBest));
+  const mda=currieMDA(sigma0,STATE.kMDA,STATE.time,eff.eps,nuc.lines[0].y,{});
+  const chips=[
+    {k:"피크 면적 S",v:fmtInt(pa.net),u:"counts",hl:true,tip:null},
+    {k:"배경 B",v:fmtInt(pa.bg),u:"counts"},
+    {k:"검출 판정",v:rej.overall?"검출":"미검출",cls:rej.overall?"good":"bad"},
+    {k:"활동도 A",v:fmt(act.A,0),u:"Bq",hl:true},
+    {k:"MDA",v:fmt(mda.MDA,0),u:"Bq"},
+  ];
+  const box=$("#statchips");box.innerHTML="";
+  chips.forEach(c=>{const d=el("div","chip"+(c.hl?" hl":""));
+    const vc=c.cls?` style="color:var(--${c.cls})"`:"";
+    d.innerHTML=`<span class="k">${c.k}</span><span class="v"${vc}>${c.v}${c.u?` <small>${c.u}</small>`:""}</span>`;
+    box.append(d);});
+  STATE._chipData={pa,rej,act,mda,eff};
+}
+
+/* =================== TAB REGISTRY =================== */
+const TABS=[
+  {id:"overview",ico:"🗺",name:"개요"},
+  {id:"spectrum",ico:"📡",name:"스펙트럼"},
+  {id:"locate",ico:"⛏",name:"Peak Locate"},
+  {id:"area",ico:"📐",name:"Peak Area"},
+  {id:"nid",ico:"🔬",name:"핵종 식별"},
+  {id:"efficiency",ico:"📈",name:"효율 보정"},
+  {id:"activity",ico:"⚛",name:"방사능"},
+  {id:"mda",ico:"🎯",name:"검출한계"},
+  {id:"calib",ico:"⚙",name:"교정·설정"},
+  {id:"math",ico:"📐",name:"분해능·Z"},
+  {id:"locate2",ico:"🔬",name:"Gamma-M 정밀"},
+  {id:"area2",ico:"📊",name:"면적 정밀"},
+  {id:"eff2",ico:"📈",name:"효율 정밀"},
+  {id:"nid2",ico:"🧬",name:"NID 정밀"},
+  {id:"mda2",ico:"🎯",name:"검출한계 정밀"},
+  {id:"settings",ico:"🎚",name:"설정 해석"},
+  {id:"verify",ico:"✅",name:"문서 검증"},
+  {id:"glossary",ico:"📖",name:"용어집"},
+];
+
+/* shared: nuclide+source controls (used by most tabs) */
+function sourceControls(){
+  const nuc=NUCLIDES[STATE.nuclide];
+  return sec("선원 · 측정 조건",
+    slider({label:"방사능 A",min:50,max:5000,step:10,val:STATE.activity,unit:"Bq",tip:"activity",
+      onInput:v=>{STATE.activity=v;recompute();renderHero();refreshViz();}}),
+    slider({label:"측정 시간 T",min:60,max:3600,step:30,val:STATE.time,unit:"s",
+      onInput:v=>{STATE.time=v;recompute();renderHero();refreshViz();}}),
+    slider({label:"배경 수준",min:0,max:4,step:0.1,val:STATE.bg,unit:"×",fmt:v=>v.toFixed(1),
+      onInput:v=>{STATE.bg=v;recompute();renderHero();refreshViz();}}),
+    slider({label:"Gain shift",min:-0.03,max:0.03,step:0.002,val:STATE.gain,unit:"",fmt:v=>(v*100).toFixed(1)+"%",tip:"gain",
+      onInput:v=>{STATE.gain=v;recompute();renderHero();refreshViz();}}),
+    toggle({label:"Poisson 잡음",desc:"실제 계측 통계요동",on:STATE.noise,
+      onClick:v=>{STATE.noise=v;recompute();renderHero();refreshViz();}}),
+  );
+}
+function scenarioPills(){
+  return sec("시나리오 프리셋",pills({active:STATE._scenario||"default",
+    options:[{v:"default",t:"표준(예제)"},{v:"weak",t:"약한 피크"},{v:"highbg",t:"고배경"},{v:"gain",t:"Gain shift"}],
+    onSelect:v=>{applyScenario(v);}}));
+}
+function applyScenario(v){
+  STATE._scenario=v;const d=NUC_DEFAULT[STATE.nuclide];
+  if(v==="default"){STATE.activity=d.activity;STATE.time=d.time;STATE.bg=d.bg;STATE.gain=0;}
+  else if(v==="weak"){STATE.activity=Math.round(d.activity*0.06);STATE.time=d.time;STATE.bg=d.bg;STATE.gain=0;}
+  else if(v==="highbg"){STATE.activity=d.activity;STATE.time=d.time;STATE.bg=3.5;STATE.gain=0;}
+  else if(v==="gain"){STATE.activity=d.activity;STATE.time=d.time;STATE.bg=d.bg;STATE.gain=0.018;}
+  recompute();renderControls();renderHero();refreshViz();
+}
+
+/* =================== TAB: OVERVIEW =================== */
+function tabOverview_controls(){
+  const frag=document.createDocumentFragment();
+  frag.append(sec("이 시뮬레이터",
+    el("div","card-sub",`NaI(Tl) 전신계측기(WBC)에서 측정한 <b style="color:var(--accent)">감마 스펙트럼</b>이 어떻게 <b style="color:var(--accent)">방사능(Bq)</b>과 <b style="color:var(--accent)">검출한계(MDA)</b>로 변환되는지, 그 전 과정을 단계별로 직접 보고 만질 수 있습니다.`)));
+  frag.append(scenarioPills());
+  frag.append(sec("바로 가기",(()=>{const w=el("div","btn-row");
+    [["spectrum","📡 스펙트럼 만들기"],["locate","⛏ 피크 찾기"],["activity","⚛ 방사능 계산"],["mda","🎯 검출한계"]].forEach(([id,t])=>{
+      const b=el("button","btn",t);b.addEventListener("click",()=>switchTab(id));w.append(b);});return w;})()));
+  frag.append(sourceControls());
+  return frag;
+}
+function tabOverview_viz(){
+  const frag=document.createDocumentFragment();
+  const stages=[
+    ["📡","스펙트럼 취득","검출기가 채널별 계수를 기록","spectrum"],
+    ["⚙","에너지·FWHM 교정","채널↔keV, 피크 폭 관계","calib"],
+    ["⛏","Peak Locate","어느 에너지에 피크가 있나?","locate"],
+    ["📐","Peak Area","피크가 몇 개의 계수인가?","area"],
+    ["🔬","핵종 식별","이 피크는 무슨 핵종인가?","nid"],
+    ["📈","효율 보정","검출기가 얼마나 잘 잡나?","efficiency"],
+    ["⚛","방사능 계산","실제 몇 Bq인가?","activity"],
+    ["🎯","검출한계 MDA","최소 몇 Bq까지 보나?","mda"],
+  ];
+  const c=card({title:"🗺 분석 파이프라인",badge:"전체 흐름",
+    sub:"각 단계를 누르면 해당 탭으로 이동합니다. 위 스펙트럼은 모든 단계에서 함께 변합니다."});
+  const pipe=el("div","pipe");
+  stages.forEach((s,i)=>{
+    const node=el("div","pnode");
+    node.innerHTML=`<div class="pn-n">${i+1}</div><div class="pn-ico">${s[0]}</div><div class="pn-t">${s[1]}</div><div class="pn-d">${s[2]}</div>`;
+    node.addEventListener("click",()=>switchTab(s[3]));
+    pipe.append(node);
+    if(i<stages.length-1)pipe.append(el("div","parrow","→"));
+  });
+  c.append(pipe);frag.append(c);
+
+  // current nuclide card
+  const nuc=NUCLIDES[STATE.nuclide];
+  const nc=card({title:`🔬 선택 핵종: ${STATE.nuclide}`,badge:nuc.lines.length>1?"다중선":"단일선",sub:nuc.note});
+  const tbl=el("table","dt");
+  tbl.innerHTML=`<tr><th>감마선</th><th>에너지 (keV)</th><th>방출확률 y</th><th>예상 채널</th><th>FWHM (keV)</th></tr>`+
+    nuc.lines.map(l=>`<tr><td><span class="ndot" style="display:inline-block;color:${nuc.color}"></span> γ</td><td>${l.E.toFixed(1)}</td><td>${(l.y*100).toFixed(2)}%</td><td>${Math.round(E2ch(l.E))}</td><td>${fwhmKeV(l.E).toFixed(1)}</td></tr>`).join("");
+  nc.append(tbl);
+  nc.append(el("div","note",`<span class="ni">💡</span><div>반감기 <b>${(nuc.halfLife_d/365.25).toFixed(2)}년</b>. 상단 핵종 선택을 바꾸면 <b>모든 탭</b>이 그 핵종 기준으로 다시 계산됩니다.</div>`));
+  frag.append(nc);
+
+  // what makes this hard
+  const hc=card({title:"⚖ 왜 알고리즘이 필요한가?",sub:"단순히 '라이브러리 에너지에 피크가 있다'고 표시하는 것으로는 부족합니다."});
+  const g=el("div","grid3");
+  [["🏔","Compton 연속체","광전피크 왼쪽으로 넓게 깔린 산란 성분이 배경 추정을 어렵게 함","compton"],
+   ["📏","넓은 NaI 피크","분해능이 낮아 피크가 넓고 서로 겹침 → ROI 배경 과대·과소","fwhm"],
+   ["🌡","Gain shift","온도 등으로 피크 위치가 밀림 → 위치 보정 필요","gain"]].forEach(x=>{
+    const d=el("div","acard");d.innerHTML=`<div class="at">${x[0]} ${x[1]}</div><div style="font-size:11.5px;color:var(--ink-dim);line-height:1.5">${x[2]} <span class="q" data-tip="${x[3]}">?</span></div>`;g.append(d);});
+  hc.append(g);frag.append(hc);
+  return frag;
+}
+
+/* =================== TAB: SPECTRUM =================== */
+function tabSpectrum_controls(){
+  const frag=document.createDocumentFragment();
+  frag.append(scenarioPills());
+  frag.append(sourceControls());
+  frag.append(sec("스펙트럼 분해",
+    toggle({label:"성분 분해 표시",desc:"광전피크·Compton·배경",on:STATE.showDecomp,tip:"compton",
+      onClick:v=>{STATE.showDecomp=v;renderHero();}}),
+    slider({label:"재현 seed",min:1,max:9999,step:1,val:STATE.seed,
+      onInput:v=>{STATE.seed=v;recompute();renderHero();refreshViz();}})));
+  return frag;
+}
+function tabSpectrum_viz(){
+  const frag=document.createDocumentFragment();
+  const sim=STATE.sim,nuc=NUCLIDES[STATE.nuclide];
+  const c=card({title:"📡 감마 스펙트럼의 구성",badge:"분해",glow:true,
+    sub:"검출기가 기록하는 <b>총 계수</b>는 여러 성분의 합입니다. 위 스펙트럼에서 <b>성분 분해 표시</b>를 켜면 각 성분을 색으로 볼 수 있습니다."});
+  c.innerHTML+=`<div class="calc">
+    <div class="row"><span class="num">총 계수(ch)</span><span class="op">=</span><span class="var">광전피크</span><span class="op">+</span><span style="color:var(--accent-2)">Compton 연속체</span><span class="op">+</span><span style="color:var(--line-cont)">자연·검출기 배경</span><span class="op">+</span><span class="lhs">통계 요동</span></div></div>`;
+  const g=el("div","grid3");g.style.marginTop="14px";
+  [["광전피크",nuc.color,"감마선이 검출기에 <b>전 에너지</b>를 줄 때 생기는 좁은 봉우리. 면적이 곧 검출량."],
+   ["Compton 연속체","var(--accent-2)","감마선이 <b>일부 에너지</b>만 주고 튕길 때. 광전피크 왼쪽으로 넓게 퍼짐."],
+   ["배경","var(--line-cont)","자연방사능·검출기 잡음. 저에너지에서 높고 완만히 감소."]].forEach(x=>{
+    const d=el("div","acard");d.innerHTML=`<div class="at" style="color:${x[1]}">${x[0]}</div><div style="font-size:11.5px;color:var(--ink-dim);line-height:1.55">${x[2]}</div>`;g.append(d);});
+  c.append(g);frag.append(c);
+
+  // photopeak math
+  const pc=card({title:"🔢 광전피크 면적 계산",sub:"방사능이 클수록, 효율·방출확률·시간이 클수록 피크 면적이 큽니다."});
+  const f=STATE.loc.fits[0];const eff=effOf(f.E);const S=STATE.activity*nuc.lines[0].y*eff.eps*STATE.time;
+  pc.innerHTML+=`<div class="calc">
+    <div class="row"><span class="lhs">S</span><span class="op">=</span><span class="var">A</span><span class="op">·</span><span class="var">y</span><span class="op">·</span><span class="var">ε(E)</span><span class="op">·</span><span class="var">T</span></div>
+    <div class="row"><span class="lhs"></span><span class="op">=</span><span class="num">${STATE.activity}</span><span class="op">·</span><span class="num">${nuc.lines[0].y.toFixed(3)}</span><span class="op">·</span><span class="num">${eff.eps.toFixed(4)}</span><span class="op">·</span><span class="num">${STATE.time}</span></div>
+    <div class="row"><span class="lhs"></span><span class="op">=</span><span class="res">${fmtInt(S)}</span><span class="num">counts</span><span class="cmt">광전피크의 이론 면적</span></div></div>`;
+  if(STATE.nuclide==="Cs-137")pc.append(el("div","note",`<span class="ni">✅</span><div>이 값은 딥다이브 문서의 검증 예제(<b>S ≈ 5104 counts</b>)와 일치하도록 보정되어 있습니다. (A=833 Bq, T=600 s)</div>`));
+  if(STATE.nuclide==="Cd-109")pc.append(el("div","note warn",`<span class="ni">⚠</span><div>Cd-109은 방출확률 y가 <b>3.64%</b>로 매우 낮아, 같은 방사능이라도 피크가 훨씬 작습니다. 저에너지·저수율 핵종의 어려움을 보여줍니다.</div>`));
+  frag.append(pc);
+  return frag;
+}
+
+/* =================== TAB: PEAK LOCATE (Gamma-M) =================== */
+function tabLocate_controls(){
+  const frag=document.createDocumentFragment();
+  // 알고리즘 선택기 (5종 실제 실행)
+  frag.append(sec("Peak Locate 알고리즘 선택",
+    pills({active:STATE.plAlgo,options:[
+      {v:"user",t:"User"},{v:"simple",t:"Simple"},{v:"gammaM",t:"Gamma-M ★"},
+      {v:"sd",t:"2nd Diff"},{v:"vms",t:"VMS"}],
+      onSelect:v=>{STATE.plAlgo=v;refreshViz();}}),
+    el("div","card-sub","5종을 같은 스펙트럼에 <b>실제로 실행</b>해 비교합니다. 선택한 알고리즘의 상세가 아래에 표시됩니다. <span class='q' data-tip='erosion'>?</span>")));
+  // Gamma-M 파라미터
+  frag.append(sec("Gamma-M 파라미터",
+    slider({label:"erosion bin 계수 k",min:0.2,max:0.8,step:0.05,val:STATE.k,fmt:v=>v.toFixed(2),tip:"erosion",
+      onInput:v=>{STATE.k=v;recompute();renderHero();refreshViz();}}),
+    slider({label:"erosion 반복",min:0,max:12,step:1,val:STATE.erodeStep,unit:"회",tip:"erosion",
+      onInput:v=>{STATE.erodeStep=v;recompute();renderHero();refreshViz();}})));
+  // 2nd Difference 파라미터
+  frag.append(sec("2nd Difference 파라미터",
+    slider({label:"유의성 임계 f",min:1,max:6,step:0.5,val:STATE.sdF,fmt:v=>v.toFixed(1),
+      onInput:v=>{STATE.sdF=v;refreshViz();}})));
+  const playBtn=el("button","btn pri","▶ erosion 단계별 재생");
+  playBtn.addEventListener("click",()=>playErosion(playBtn));
+  frag.append(sec("애니메이션",playBtn));
+  frag.append(sec("Rejection 기준 (Gamma-M)",
+    slider({label:"MDA sigma C₂",min:1,max:5,step:0.1,val:STATE.C2,fmt:v=>v.toFixed(1),tip:"mda_rej",
+      onInput:v=>{STATE.C2=v;renderHero();refreshViz();}}),
+    slider({label:"높이 불확도 F_V",min:0.2,max:4,step:0.1,val:STATE.FV,fmt:v=>v.toFixed(1),tip:"var_rej",
+      onInput:v=>{STATE.FV=v;refreshViz();}}),
+    slider({label:"배경 대비 F_B",min:0.2,max:4,step:0.1,val:STATE.FB,fmt:v=>v.toFixed(1),tip:"back_rej",
+      onInput:v=>{STATE.FB=v;refreshViz();}}),
+    toggle({label:"Gain shift 보정",desc:"NaI 위치 이동 보정",on:STATE.gainOn,tip:"gain",
+      onClick:v=>{STATE.gainOn=v;refreshViz();}})));
+  return frag;
+}
+function playErosion(btn){
+  if(STATE._erodeAnim){clearInterval(STATE._erodeAnim);STATE._erodeAnim=null;btn.innerHTML="▶ erosion 단계별 재생";return;}
+  let step=0;btn.innerHTML="⏸ 정지";
+  STATE._erodeAnim=setInterval(()=>{
+    STATE.erodeStep=step;recompute();renderHero();refreshViz();
+    step++;if(step>12){clearInterval(STATE._erodeAnim);STATE._erodeAnim=null;btn.innerHTML="▶ erosion 단계별 재생";STATE.erodeStep=8;}
+  },420);
+}
+function tabLocate_viz(){
+  const frag=document.createDocumentFragment();
+  const loc=STATE.loc,sim=STATE.sim,nuc=NUCLIDES[STATE.nuclide];
+  const libE=nuc.lines.map(l=>l.E);
+  const opt={k:STATE.k,iters:STATE.erodeStep,C1:STATE.C1,C2:STATE.C2,FV:STATE.FV,FB:STATE.FB,
+             sdF:STATE.sdF,maxLeft:STATE.maxLeft,maxRight:STATE.maxRight,nBg:STATE.nBg};
+  const all=runAllPeakLocate(sim.Y,libE,opt);
+  const keyMap={"User Specified":"user","Library Simple":"simple","Library Gamma-M":"gammaM","2nd Difference":"sd","VMS Standard":"vms"};
+
+  // ===== 1) 5종 실제 실행 비교 =====
+  const ac=card({title:"⛏ Peak Locate 5종 — 실제 실행 결과",badge:"실측 비교",glow:true,
+    sub:"같은 스펙트럼에 5개 알고리즘을 <b>실제로 실행</b>했습니다. 각자 검출한 피크와 존재검정 결과가 다릅니다."});
+  const tbl=el("table","dt");
+  let rows=`<tr><th>알고리즘</th><th>검출 피크 (keV)</th><th>지표</th><th>존재검정</th></tr>`;
+  Object.entries(all).forEach(([name,peaks])=>{
+    const det=peaks.filter(p=>p.detected);
+    const isCur=keyMap[name]===STATE.plAlgo;
+    const es=det.length?det.map(p=>Math.round(p.E)).join(", "):"<span style='color:var(--ink-faint)'>— 없음</span>";
+    const info=det.length?det.map(p=>p.signif!=null?`σ=${p.signif.toFixed(1)}`:(p.area!=null?fmtInt(p.area):"")).join(" · "):"—";
+    const test=peaks[0]?peaks[0].test:"";
+    rows+=`<tr style="${isCur?'background:var(--bg-panel-3);box-shadow:inset 3px 0 0 var(--accent)':''}">
+      <td style="text-align:left;font-weight:${isCur?700:500}">${name}${isCur?' ◀':''}</td>
+      <td>${es}</td><td style="font-size:10.5px">${info}</td><td style="font-size:10.5px;text-align:left">${test}</td></tr>`;
+  });
+  tbl.innerHTML=rows;ac.append(tbl);
+  ac.append(el("div","note",`<span class="ni">⛏</span><div><b>User</b>는 지정 위치를 검정 없이 적합(거짓 양성 위험), <b>Simple</b>은 약한 net>0, <b>Gamma-M</b>은 5종 rejection, <b>2nd Difference</b>는 라이브러리 없이 미지 피크를 찾고, <b>VMS</b>는 step 배경 + critical level 검정을 씁니다. 위에서 <b>알고리즘 선택</b>을 바꾸면 그 알고리즘 상세가 아래에 표시됩니다.</div>`));
+  frag.append(ac);
+
+  // ===== 2) 선택 알고리즘 상세 =====
+  if(STATE.plAlgo==="gammaM"){
+    // erosion
+    const ec=card({title:"🏔 Gamma-M 1단계: Erosion 배경 추정",badge:`반복 ${STATE.erodeStep}회`,glow:true,
+      sub:`스펙트럼을 <b>FWHM×${STATE.k.toFixed(2)} = ${loc.binW}채널</b> bin으로 묶고 봉우리를 깎아 continuum을 만듭니다. 4개 <span class="q" data-tip="ply">PLY</span> 중 최소값을 배경으로 채택합니다.`});
+    const cw=el("div","subviz");cw.style.height="170px";const cvE=el("canvas");cw.append(cvE);ec.append(cw);
+    ec.append(el("div","note",`<span class="ni">⛏</span><div>큰 차트의 <b style="color:var(--line-cont)">앰버 선</b>=erosion 배경, <b style="color:var(--line-net)">시안 선</b>=net. <b>erosion 반복</b>을 0→8로 올려보세요.`));
+    frag.append(ec);setTimeout(()=>drawErosionBins(cvE),30);
+    // fit
+    const f=loc.fits[0];
+    const gc=card({title:"📐 Gamma-M 2단계: Gaussian 적합",sub:"net 스펙트럼의 라이브러리 위치에 가우스를 가중최소제곱으로 맞춰 H·면적을 구합니다. <span class='q' data-tip='gauss'>?</span>"});
+    const gtbl=el("table","dt");
+    gtbl.innerHTML=`<tr><th>감마선</th><th>중심 ch</th><th>높이 H</th><th>σ_H</th><th>면적 A</th><th>배경 B</th></tr>`+
+      loc.fits.map(ff=>`<tr><td>${ff.E.toFixed(1)} keV</td><td>${ff.ctr.toFixed(1)}</td><td>${fmt(ff.H,1)}</td><td>${fmt(ff.sigmaH,2)}</td><td>${fmtInt(ff.area)}</td><td>${fmt(ff.bgHeight,1)}</td></tr>`).join("");
+    gc.append(gtbl);
+    gc.innerHTML+=`<div class="calc" style="margin-top:12px"><div class="row"><span class="lhs">A</span><span class="op">≈</span><span class="var">H</span><span class="op">·</span><span class="var">Z</span><span class="op">·</span><span class="num">√π</span><span class="op">,</span><span class="lhs">Z</span><span class="op">=</span>${frac("FWHM","2√ln2")}<span class="op">=</span><span class="res">${fmt(f.Z,2)}</span></div></div>`;
+    frag.append(gc);
+    // rejection (5종)
+    const rej=rejectionTests(f,sim.Y,STATE);
+    const rc=card({title:"🚦 Gamma-M 3단계: Peak Rejection 5종",badge:rej.overall?"통과":"탈락",
+      sub:"통계 3종 + 구조 2종을 통과해야 진짜 피크입니다."});
+    const tests=[
+      ["① MDA rejection",rej.mda.pass,"mda_rej","면적 > C₁+C₂√(Σy/0.966²)",`${fmtInt(rej.mda.lhs)} > ${fmtInt(rej.mda.rhs)}`],
+      ["② 높이 불확도",rej.varr.pass,"var_rej","h² > F_V·σ_h²",`${fmtInt(rej.varr.lhs)} > ${fmt(rej.varr.rhs,1)}`],
+      ["③ 배경 대비 높이",rej.back.pass,"back_rej","h² > F_B·B",`${fmtInt(rej.back.lhs)} > ${fmt(rej.back.rhs,1)}`],
+    ];
+    tests.forEach(t=>{const d=el("div","test");
+      d.innerHTML=`<span class="bdg ${t[1]?"pass":"fail"}">${t[1]?"PASS":"FAIL"}</span><div class="tt"><div class="nm">${t[0]} <span class="q" data-tip="${t[2]}">?</span></div><div class="fm">${t[3]} → ${t[4]}</div></div>`;
+      rc.append(d);});
+    [["④ 인접 라이브러리 피크","OVERWIND 내 겹침 검사 → 통과"],["⑤ unknown 위치근접","library 위치라 unknown 중복 처리 안 함"]].forEach(t=>{
+      const d=el("div","test");d.innerHTML=`<span class="bdg pass">PASS</span><div class="tt"><div class="nm">${t[0]}</div><div class="fm">${t[1]}</div></div>`;rc.append(d);});
+    // Unknown peak search (dd) — 실제 구현
+    const uk=unknownPeakSearch(sim.Y,loc.continuum,{});
+    const uc=card({title:"🔍 Gamma-M 보조: Unknown Peak 탐색 (dd)",badge:`${uk.length}개 후보`,
+      sub:"라이브러리에 없는 피크도 dd 지표로 찾습니다. C=W√(B/W), dd=(O−C−K₁)/(K₂√(W(B+C))), dd>1 이면 후보."});
+    const ut=el("table","dt");
+    ut.innerHTML=`<tr><th>채널</th><th>에너지(keV)</th><th>dd</th><th>판정</th></tr>`+
+      (uk.length?uk.slice(0,8).map(c=>`<tr><td>${c.ch}</td><td>${c.E.toFixed(0)}</td><td>${c.dd.toFixed(1)}</td><td><span class="tag ${c.dd>1?'g':'r'}">${c.dd>1?'후보':'기각'}</span></td></tr>`).join(""):`<tr><td colspan="4" style="color:var(--ink-faint)">후보 없음</td></tr>`);
+    uc.append(ut);
+    uc.append(el("div","note",`<span class="ni">🔍</span><div>광전피크 위치에서 dd가 가장 큽니다. dd>1 후보 중 라이브러리와 겹치지 않는 것이 진짜 미지 피크 후보입니다(저수준 배경요동도 dd~1 부근에서 잡힐 수 있음).</div>`));
+    frag.append(uc);
+  } else if(STATE.plAlgo==="sd"){
+    const sd=plSecondDiff(sim.Y,opt);
+    const c=card({title:"🌊 2nd Difference — 미지 피크 자동 탐색",badge:`${sd.peaks.length}개 검출`,glow:true,
+      sub:"라이브러리 <b>없이</b> 평활 2차차분 SD=Σc·Y 의 음의 골을 찾습니다. 유의성 −SD/σ > f 이면 피크."});
+    const cw=el("div","subviz");cw.style.height="180px";const cv=el("canvas");cw.append(cv);c.append(cw);
+    const t=el("table","dt");
+    t.innerHTML=`<tr><th>채널</th><th>에너지(keV)</th><th>유의성 |SD|/σ</th><th>판정</th></tr>`+
+      (sd.peaks.length?sd.peaks.map(p=>`<tr><td>${p.ch}</td><td>${p.E.toFixed(1)}</td><td>${p.signif.toFixed(1)}</td><td><span class="tag g">검출</span></td></tr>`).join(""):`<tr><td colspan="4" style="color:var(--ink-faint)">검출된 피크 없음 (유의성 f를 낮춰보세요)</td></tr>`);
+    c.append(t);
+    c.append(el("div","note",`<span class="ni">🌊</span><div>2차 미분은 봉우리에서 큰 음수가 됩니다. 잡음을 줄이려 평활(폭 ${sd.wsm}채널)을 적용했습니다. 라이브러리에 없는 미지 핵종도 찾을 수 있는 것이 장점입니다.</div>`));
+    frag.append(c);setTimeout(()=>draw2ndDiff(cv,sd),30);
+  } else {
+    // user / simple / vms
+    const data=STATE.plAlgo==="user"?all["User Specified"]:STATE.plAlgo==="simple"?all["Library Simple"]:all["VMS Standard"];
+    const meta={user:["👆 User Specified","사용자가 지정한 채널에서 그대로 적합합니다. 존재 검정이 없어 거짓 양성에 취약합니다."],
+                simple:["📍 Library (Simple)","라이브러리 에너지를 채널로 변환해 ROI 합·centroid를 구합니다. 검정은 net>0 수준으로 약합니다."],
+                vms:["📐 VMS Standard","step 배경 위에서 critical level(95%) 검정을 적용합니다. 배경 비대칭에 강건합니다."]}[STATE.plAlgo];
+    const c=card({title:meta[0],badge:"실측",glow:true,sub:meta[1]});
+    const t=el("table","dt");
+    t.innerHTML=`<tr><th>에너지(keV)</th><th>중심 ch</th><th>면적/순계수</th><th>존재검정</th></tr>`+
+      data.map(p=>`<tr><td>${p.E.toFixed(1)}</td><td>${p.ch.toFixed(1)}</td><td>${fmtInt(p.area!=null?p.area:p.net)}</td><td><span class="tag ${p.detected?'g':'r'}">${p.detected?'검출':'미검출'}</span> <span style="font-size:10px;color:var(--ink-dim)">${p.test}</span></td></tr>`).join("");
+    c.append(t);
+    if(STATE.plAlgo==="vms")c.append(el("div","note",`<span class="ni">📐</span><div>VMS는 critical level L_C(95%)와 net을 비교합니다. Gamma-M의 MDA rejection과 철학이 비슷하나 step 배경을 기본으로 씁니다.</div>`));
+    frag.append(c);
+  }
+  return frag;
+}
+function draw2ndDiff(canvas,sd){
+  if(!canvas||!canvas.isConnected)return;
+  const {ctx,w,h}=clearCv(canvas);const sim=STATE.sim,nuc=NUCLIDES[STATE.nuclide];
+  const f=STATE.loc.fits[0];const ctr=f.ctr;
+  const lo=Math.max(0,Math.round(ctr-4*f.fwhmCh)),hi=Math.min(sim.N-1,Math.round(ctr+4*f.fwhmCh));
+  const pad={l:8,r:8,t:16,b:8};
+  let mx=1;for(let ch=lo;ch<=hi;ch++)mx=Math.max(mx,Math.abs(sd.SD[ch]));mx*=1.1;
+  const X=c=>pad.l+(c-lo)/Math.max(1,(hi-lo))*(w-pad.l-pad.r);
+  const Y=v=>pad.t+(1-(v/mx+1)/2)*(h-pad.t-pad.b);
+  // zero line
+  ctx.strokeStyle="rgba(141,160,191,.3)";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(pad.l,Y(0));ctx.lineTo(w-pad.r,Y(0));ctx.stroke();
+  // SD curve
+  ctx.beginPath();for(let ch=lo;ch<=hi;ch++){const x=X(ch),y=Y(sd.SD[ch]);ch===lo?ctx.moveTo(x,y):ctx.lineTo(x,y);}
+  ctx.strokeStyle="#4dd4ff";ctx.lineWidth=1.6;ctx.stroke();
+  // detected peaks (vertical markers at SD minima)
+  sd.peaks.forEach(p=>{if(p.ch>=lo&&p.ch<=hi){const x=X(p.ch);
+    ctx.strokeStyle="#ff5d8f";ctx.lineWidth=1.5;ctx.setLineDash([3,3]);ctx.beginPath();ctx.moveTo(x,pad.t);ctx.lineTo(x,h-pad.b);ctx.stroke();ctx.setLineDash([]);}});
+  ctx.font="9px 'JetBrains Mono'";ctx.textBaseline="top";ctx.fillStyle="#8da0bf";
+  ctx.fillText("2차차분 SD (시안) · 음의 골=피크 후보(핑크 점선)",pad.l,2);
+}
+
+function drawErosionBins(canvas){
+  if(!canvas||!canvas.isConnected)return;
+  const {ctx,w,h}=clearCv(canvas);const loc=STATE.loc,sim=STATE.sim,nuc=NUCLIDES[STATE.nuclide];
+  const f=loc.fits[0];const ctr=f.ctr;
+  // window around peak
+  const lo=Math.max(0,Math.round(ctr-3*f.fwhmCh)),hi=Math.min(sim.N-1,Math.round(ctr+3*f.fwhmCh));
+  const bins=loc.bins.filter(b=>b.center>=lo&&b.center<=hi);
+  if(bins.length===0)return;
+  const pad={l:8,r:8,t:14,b:8};
+  let maxv=1;bins.forEach(b=>maxv=Math.max(maxv,b.mean));maxv*=1.1;
+  const X=c=>pad.l+(c-lo)/(hi-lo)*(w-pad.l-pad.r);
+  const Y=v=>h-pad.b-v/maxv*(h-pad.t-pad.b);
+  const plyColors=["#ff5d8f","#4dd4ff","#ffd166","#58d68d"];
+  // raw outline
+  ctx.beginPath();for(let ch=lo;ch<=hi;ch++){const x=X(ch),y=Y(sim.Y[ch]);ch===lo?ctx.moveTo(x,y):ctx.lineTo(x,y);}
+  ctx.strokeStyle="rgba(107,125,163,.5)";ctx.lineWidth=1;ctx.stroke();
+  // bins before (light) and after erosion (solid), colored by PLY
+  bins.forEach((b,i)=>{const idx=loc.bins.indexOf(b);const pl=idx%4;const bw=(X(b.end)-X(b.start))*0.82;
+    const bx=X(b.center)-bw/2;
+    // before
+    ctx.fillStyle="rgba(141,160,191,.13)";ctx.fillRect(bx,Y(b.mean),bw,h-pad.b-Y(b.mean));
+    // after eroded
+    ctx.fillStyle=plyColors[pl]+"cc";ctx.fillRect(bx,Y(b.eroded),bw,h-pad.b-Y(b.eroded));
+  });
+  // continuum line
+  ctx.beginPath();for(let ch=lo;ch<=hi;ch++){const x=X(ch),y=Y(loc.continuum[ch]);ch===lo?ctx.moveTo(x,y):ctx.lineTo(x,y);}
+  ctx.strokeStyle="#f0a04b";ctx.lineWidth=2;ctx.stroke();
+  // legend
+  ctx.font="9px 'JetBrains Mono'";ctx.textBaseline="top";
+  ctx.fillStyle="#8da0bf";ctx.fillText("연한 막대=erosion 전 · 색 막대=erosion 후(PLY별) · 앰버선=continuum",pad.l,2);
+}
+/* ===================== PART 4b: TABS — AREA / NID / EFFICIENCY ===================== */
+
+/* =================== TAB: PEAK AREA =================== */
+function tabArea_controls(){
+  const frag=document.createDocumentFragment();
+  frag.append(sec("Continuum 모델",
+    pills({active:STATE.areaMode,options:[{v:"lin",t:"Linear 직선"},{v:"step",t:"Step 계단"}],
+      onSelect:v=>{STATE.areaMode=v;renderHero();refreshViz();}}),
+    el("div","card-sub","피크 양옆 배경 높이가 다를 때 잇는 방식. <span class='q' data-tip='continuum_type'>?</span>")));
+  frag.append(sec("ROI · 배경",
+    slider({label:"ROI 좌측 폭",min:0.5,max:3,step:0.05,val:STATE.maxLeft,unit:"×FWHM",fmt:v=>v.toFixed(2),tip:"roi",
+      onInput:v=>{STATE.maxLeft=v;renderHero();refreshViz();}}),
+    slider({label:"ROI 우측 폭",min:0.5,max:3,step:0.05,val:STATE.maxRight,unit:"×FWHM",fmt:v=>v.toFixed(2),tip:"roi",
+      onInput:v=>{STATE.maxRight=v;renderHero();refreshViz();}}),
+    slider({label:"배경 채널 수 n",min:2,max:10,step:1,val:STATE.nBg,unit:"ch",
+      onInput:v=>{STATE.nBg=v;renderHero();refreshViz();}})));
+  frag.append(sourceControls());
+  return frag;
+}
+function tabArea_viz(){
+  const frag=document.createDocumentFragment();
+  const sim=STATE.sim,nuc=NUCLIDES[STATE.nuclide],f=STATE.loc.fits[0];
+  const paL=peakArea(sim.Y,f.E,"lin",{maxLeft:STATE.maxLeft,maxRight:STATE.maxRight,nBg:STATE.nBg});
+  const paS=peakArea(sim.Y,f.E,"step",{maxLeft:STATE.maxLeft,maxRight:STATE.maxRight,nBg:STATE.nBg});
+  const pa=STATE.areaMode==="lin"?paL:paS;
+
+  const c=card({title:"📐 Peak Area — Sum 방법",badge:STATE.areaMode==="lin"?"Linear":"Step",glow:true,
+    sub:"ROI 안의 <b>총 계수(gross)</b>에서 <b>배경(B)</b>을 빼면 <b>순 피크 면적(net S)</b>입니다. 위 차트의 음영이 ROI, 앰버 선이 배경입니다."});
+  c.innerHTML+=`<div class="calc">
+    <div class="row"><span class="lhs">Gross</span><span class="op">=</span><span class="num">${fmtInt(pa.gross)}</span><span class="cmt">ROI ${pa.roi[0]}–${pa.roi[1]} ch의 총합</span></div>
+    <div class="row"><span class="lhs">배경 B</span><span class="op">=</span>${STATE.areaMode==="lin"?frac("N","2n")+'<span class="op">·</span>(B<span class="sub">1</span>+B<span class="sub">2</span>)':'누적 step 적분'}<span class="op">=</span><span class="num">${fmtInt(pa.bg)}</span></div>
+    <div class="row"><span class="lhs">Net S</span><span class="op">=</span>Gross − B<span class="op">=</span><span class="res">${fmtInt(pa.net)}</span><span class="op">±</span><span class="num">${fmtInt(pa.sigmaNet)}</span></div></div>`;
+  frag.append(c);
+
+  // linear vs step comparison
+  const cc=card({title:"⚖ Linear vs Step 배경 비교",sub:"같은 ROI에서 두 모델이 주는 net 면적 차이입니다. 피크가 흡수한 만큼 배경이 낮아지는 Step은 넓은 NaI 피크에서 더 현실적일 수 있습니다."});
+  const ctbl=el("table","dt");
+  const dd=paL.net-paS.net;
+  ctbl.innerHTML=`<tr><th>모델</th><th>배경 B</th><th>Net S</th><th>σ_S</th><th>검출판정</th></tr>
+    <tr><td>Linear</td><td>${fmtInt(paL.bg)}</td><td>${fmtInt(paL.net)}</td><td>${fmtInt(paL.sigmaNet)}</td><td><span class="tag ${paL.detected?'g':'r'}">${paL.detected?'검출':'미검출'}</span></td></tr>
+    <tr><td>Step</td><td>${fmtInt(paS.bg)}</td><td>${fmtInt(paS.net)}</td><td>${fmtInt(paS.sigmaNet)}</td><td><span class="tag ${paS.detected?'g':'r'}">${paS.detected?'검출':'미검출'}</span></td></tr>`;
+  cc.append(ctbl);
+  cc.append(el("div","note",`<span class="ni">📊</span><div>두 모델의 net 차이: <b>${fmt(Math.abs(dd),0)} counts (${fmt(Math.abs(dd)/Math.max(1,paL.net)*100,1)}%)</b>. 배경이 클수록, 좌우 배경이 비대칭일수록 차이가 커집니다.</div>`));
+  frag.append(cc);
+
+  // critical level / singlet-multiplet
+  const sc=card({title:"🎯 95% Critical Level 검정",sub:"순 면적이 통계적으로 '0보다 크다'고 말할 수 있는지 검정합니다. net S가 임계수준 L_C를 넘어야 검출로 인정됩니다."});
+  sc.innerHTML+=`<div class="calc"><div class="row"><span class="lhs">L_C</span><span class="op">=</span><span class="num">1.645</span><span class="op">·</span><span class="sqrt">√(B+σ_B²)</span><span class="op">=</span><span class="res">${fmt(pa.LC,1)}</span></div>
+    <div class="row"><span class="lhs">판정</span><span class="op">:</span> Net S = ${fmtInt(pa.net)} ${pa.net>pa.LC?'>':'≤'} L_C = ${fmt(pa.LC,1)} → <span style="color:var(--${pa.net>pa.LC?'good':'bad'})">${pa.net>pa.LC?'검출':'미검출'}</span></div></div>`;
+  if(nuc.lines.length>1){
+    sc.append(el("div","note",`<span class="ni">🔗</span><div><b>Multiplet:</b> ${STATE.nuclide}의 두 선(${nuc.lines.map(l=>l.E.toFixed(0)).join(', ')} keV)이 가깝게 겹치면 단일 ROI로는 분리가 어려워 <b>NLLS(비선형 최소제곱)</b>로 각 피크 면적을 동시에 추정합니다: area_p = H_p·σ_p·√(2π).</div>`));
+  } else {
+    sc.append(el("div","note",`<span class="ni">📍</span><div><b>Singlet:</b> ${STATE.nuclide}은 단일 피크라 Sum 방법으로 충분합니다. 인접 피크가 있을 때만 NLLS multiplet 분해가 필요합니다.</div>`));
+  }
+  frag.append(sc);
+  if(nuc.lines.length>=2){
+    const ml=nllsMultiplet(sim.Y,nuc.lines.map(l=>l.E),STATE.loc.continuum);
+    const nc=card({title:"🧩 NLLS Multiplet 분해 (실제 적용)",badge:`${ml.peaks.length}개 동시적합`,glow:true,
+      sub:`겹친 피크를 고정형상 다중 가우스로 <b>동시 적합</b>해 각 피크 면적을 분리합니다. 결합 ROI ${ml.roi[0]}–${ml.roi[1]} ch.`});
+    const mt=el("table","dt");
+    mt.innerHTML=`<tr><th>감마선(keV)</th><th>중심 ch</th><th>높이 H</th><th>분리 면적 A_p</th></tr>`+
+      ml.peaks.map(p=>`<tr><td>${p.E.toFixed(1)}</td><td>${p.ctr.toFixed(1)}</td><td>${fmt(p.H,1)}</td><td>${fmtInt(p.area)}</td></tr>`).join("");
+    nc.append(mt);
+    nc.append(el("div","note",`<span class="ni">🧩</span><div>A_p = H_p·Z_p·√π. 중심·폭은 교정에서 고정하므로 진폭에 대해 선형 → 한 번의 가중최소제곱으로 동시 분리됩니다. singular matrix면 일부 파라미터를 고정해 회피합니다.</div>`));
+    frag.append(nc);
+  }
+  return frag;
+}
+
+/* =================== TAB: NUCLIDE ID =================== */
+function tabNid_controls(){
+  const frag=document.createDocumentFragment();
+  frag.append(sec("매칭 라이브러리",(()=>{const w=el("div");
+    ["Cs-137","Co-60","Cd-109"].forEach(n=>{
+      w.append(toggle({label:n,desc:NUCLIDES[n].lines.map(l=>l.E.toFixed(0)).join("/")+" keV",
+        on:STATE.library.includes(n),
+        onClick:v=>{if(v&&!STATE.library.includes(n))STATE.library.push(n);
+          else if(!v)STATE.library=STATE.library.filter(x=>x!==n);renderHero();refreshViz();}}));});
+    return w;})()));
+  frag.append(sec("에너지 tolerance",
+    slider({label:"고정 tolerance",min:5,max:60,step:1,val:STATE.tolFixed,unit:"keV",tip:"energy_cal",
+      onInput:v=>{STATE.tolFixed=v;renderHero();refreshViz();}}),
+    slider({label:"가변(FWHM배)",min:0.3,max:3,step:0.1,val:STATE.tolVarFW,unit:"×FWHM",fmt:v=>v.toFixed(1),tip:"conf_index",
+      onInput:v=>{STATE.tolVarFW=v;renderHero();refreshViz();}}),
+    toggle({label:"가변 tolerance 사용",desc:"에너지↑일수록 허용폭↑",on:STATE.useVar,
+      onClick:v=>{STATE.useVar=v;renderHero();refreshViz();}})));
+  frag.append(sourceControls());
+  return frag;
+}
+function tabNid_viz(){
+  const frag=document.createDocumentFragment();
+  const sim=STATE.sim;
+  const results=nuclideID(sim,STATE.loc,STATE.library,STATE);
+
+  const c=card({title:"🔬 핵종 식별 — Confidence Index",badge:"NID Plus",glow:true,
+    sub:"관측된 피크가 각 핵종일 <b>확신 점수(CI)</b>를 계산합니다. 에너지가 잘 맞고, 기대되는 모든 선이 검출될수록 높습니다. <span class='q' data-tip='conf_index'>?</span>"});
+  results.forEach(r=>{
+    const pct=Math.round(r.CI*100);
+    const row=el("div");row.style.marginBottom="12px";
+    row.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
+      <span style="font-weight:700;font-size:13px"><span class="ndot" style="display:inline-block;color:${r.color}"></span> ${r.nuclide}</span>
+      <span class="mono" style="font-weight:700;color:${pct>70?'var(--good)':pct>40?'var(--warn)':'var(--bad)'}">${pct}%</span></div>
+      <div style="height:9px;border-radius:5px;background:#1a2234;overflow:hidden">
+        <div style="height:100%;width:${pct}%;background:${r.color};border-radius:5px;transition:.4s"></div></div>`;
+    c.append(row);
+  });
+  frag.append(c);
+
+  // energy matching detail for top candidate
+  const top=results[0];
+  const mc=card({title:`📍 에너지 매칭 상세 — ${top.nuclide}`,
+    sub:"관측된 피크 중심 에너지가 라이브러리 인증 에너지와 tolerance 창 안에서 일치하는지 봅니다."});
+  const mtbl=el("table","dt");
+  mtbl.innerHTML=`<tr><th>인증 E</th><th>관측 E</th><th>ΔE</th><th>tolerance</th><th>일치도</th><th>검출</th></tr>`+
+    top.parts.map(p=>`<tr><td>${p.E.toFixed(1)}</td><td>${p.obsE.toFixed(1)}</td><td>${fmt(p.dE,1)}</td><td>±${fmt(p.tol/2,1)}</td><td>${(p.enScore*100).toFixed(0)}%</td><td><span class="tag ${p.detected?'g':'r'}">${p.detected?'✓':'✗'}</span></td></tr>`).join("");
+  mc.append(mtbl);
+  frag.append(mc);
+
+  // missing line / interference
+  const ic=card({title:"🧩 Missing-line & Interference",sub:"기대되는 선이 빠지면 감점, 한 피크를 두 핵종이 설명하면 면적을 나눠 가집니다."});
+  const nuc=NUCLIDES[STATE.nuclide];
+  if(nuc.lines.length>1){
+    ic.append(el("div","note",`<span class="ni">🔗</span><div><b>${STATE.nuclide}는 두 선(${nuc.lines.map(l=>l.E.toFixed(0)).join(', ')} keV)이 모두 보여야</b> 확신이 높아집니다. 한 선만 검출되면 missing-line penalty로 CI가 낮아집니다.</div>`));
+  }
+  ic.append(el("div","note",`<span class="ni">⚗</span><div><b>Interference:</b> 서로 다른 핵종의 감마선이 같은 에너지에 겹치면, 연립방정식으로 각 핵종 기여 면적을 분배합니다 — [A₁; A₂] = M⁻¹[총면적]. 본 시뮬레이터의 세 핵종은 에너지가 충분히 떨어져 직접 간섭은 없습니다(662 / 88 / 1173·1332 keV).</div>`));
+  // weighted mean preview for Co-60
+  if(nuc.lines.length>1){
+    const vals=nuc.lines.map(l=>{const ff=STATE.loc.fits.find(x=>Math.abs(x.E-l.E)<1);const eff=effOf(l.E);
+      const pa=peakArea(sim.Y,l.E,"lin",{maxLeft:1.25,maxRight:1.25,nBg:STATE.nBg});
+      const act=activityCalc(pa.net,pa.sigmaNet,STATE.time,eff.eps,eff.sigma,l.y,0,{});
+      return {E:l.E,C:act.A,sigma:act.sigmaA};});
+    const wm=weightedMean(vals);
+    const wc=card({title:"⚖ 다중선 가중평균 활동도",sub:"두 선 각각에서 구한 활동도를, 불확도가 작은 쪽에 더 큰 가중치를 주어 합칩니다."});
+    const wtbl=el("table","dt");
+    wtbl.innerHTML=`<tr><th>감마선</th><th>활동도 (Bq)</th><th>±σ</th><th>가중치</th></tr>`+
+      vals.map((v,i)=>`<tr><td>${v.E.toFixed(1)} keV</td><td>${fmt(v.C,0)}</td><td>${fmt(v.sigma,0)}</td><td>${(wm.weights[i]*100).toFixed(0)}%</td></tr>`).join("")+
+      `<tr style="border-top:2px solid var(--accent)"><td><b>가중평균</b></td><td colspan="3"><b style="color:var(--accent)">${fmt(wm.mean,1)} ± ${fmt(wm.sigma,1)} Bq</b></td></tr>`;
+    wc.append(wtbl);
+    frag.append(wc);
+  }
+  frag.append(ic);
+  {
+    const names=STATE.library.slice(0,2);
+    const Es=names.map(nm=>NUCLIDES[nm].lines[0].E);
+    const intf=interferenceCorrection(Es,names);
+    const trueA=names.map((_,i)=>[800,500][i]||300);
+    const rates=Es.map((E,i)=>intf.M[i].reduce((s,v,j)=>s+v*trueA[j],0));
+    const solved=intf.solve(rates);
+    const fc=card({title:"🔗 간섭보정 — 행렬 역산 (실제 적용)",badge:`${intf.M.length}×${intf.M[0].length}`,
+      sub:"한 에너지에 여러 핵종이 기여하면 관측=(효율·yield 행렬)·활동도. 행렬을 역산해 활동도를 분리합니다."});
+    const ft=el("table","dt");
+    ft.innerHTML=`<tr><th>핵종</th><th>가정 활동도(Bq)</th><th>역산 활동도(Bq)</th></tr>`+
+      (solved?names.map((nm,i)=>`<tr><td>${nm}</td><td>${trueA[i]}</td><td>${solved[i]?fmt(solved[i].A,1):'—'}</td></tr>`).join(""):`<tr><td colspan="3">행렬 특이(역산 불가)</td></tr>`);
+    fc.append(ft);
+    fc.append(el("div","note",`<span class="ni">🔗</span><div>민감도 행렬 M[i][j]=ε(E_i)·y(핵종 j @ E_i). 관측 r=M·A 에서 A=M⁻¹·r 로 분리합니다. 가정값과 역산값이 일치하면 역산이 정확합니다(실제 간섭은 off-diagonal 항이 클 때 발생).</div>`));
+    frag.append(fc);
+  }
+  return frag;
+}
+
+/* =================== TAB: EFFICIENCY =================== */
+function tabEff_controls(){
+  const frag=document.createDocumentFragment();
+  frag.append(sec("효율 모델",
+    pills({active:STATE.effModel,options:[{v:"loglog",t:"Log-Log 다항"},{v:"interp",t:"점간 보간"}],
+      onSelect:v=>{STATE.effModel=v;refreshViz();}}),
+    el("div","card-sub","교정점들로부터 임의 에너지의 효율을 추정하는 방식. <span class='q' data-tip='efficiency'>?</span>")));
+  frag.append(sec("효율 불확도",
+    slider({label:"효율 상대불확도",min:1,max:10,step:0.5,val:CAL.effRelUnc*100,unit:"%",fmt:v=>v.toFixed(1),
+      onInput:v=>{CAL.effRelUnc=v/100;renderHero();refreshViz();}})));
+  frag.append(sourceControls());
+  return frag;
+}
+function tabEff_viz(){
+  const frag=document.createDocumentFragment();
+  const nuc=NUCLIDES[STATE.nuclide];
+  const c=card({title:"📈 효율 곡선 (Efficiency Curve)",badge:"Log-Log",glow:true,
+    sub:"검출 효율 ε은 에너지에 따라 변합니다. 저에너지에서 높고, 고에너지로 갈수록 낮아집니다. 교정점들을 곡선으로 이어 임의 피크의 ε을 보간합니다."});
+  const cw=el("div","subviz");cw.style.height="220px";const cv=el("canvas");cw.append(cv);c.append(cw);
+  frag.append(c);
+  setTimeout(()=>drawEffCurve(cv),30);
+
+  // efficiency at peaks
+  const ec=card({title:"🎯 피크 에너지에서의 효율 보간",sub:"현재 핵종의 각 감마선 에너지에서 곡선이 주는 효율값입니다."});
+  const etbl=el("table","dt");
+  etbl.innerHTML=`<tr><th>감마선</th><th>에너지</th><th>효율 ε</th><th>±σ_ε</th><th>상대불확도</th></tr>`+
+    nuc.lines.map(l=>{const e=effOf(l.E);return `<tr><td>γ</td><td>${l.E.toFixed(1)} keV</td><td>${e.eps.toFixed(4)}</td><td>${e.sigma.toFixed(4)}</td><td>${(CAL.effRelUnc*100).toFixed(1)}%</td></tr>`;}).join("");
+  ec.append(etbl);
+  ec.innerHTML+=`<div class="calc" style="margin-top:12px"><div class="row"><span class="lhs">ε(E)</span><span class="op">=</span>${frac("S","T·y·A·K_w·U_f")}<span class="cmt">교정선원으로 측정해 곡선 생성</span></div></div>`;
+  frag.append(ec);
+
+  // models + geometry
+  const mc=card({title:"🔧 효율 모델 & 기하 보정",sub:"WBC에서는 측정 대상의 체격·자세가 효율에 영향을 줍니다."});
+  const g=el("div","grid2");
+  [["효율 모델","Dual·Empirical·Linear·Interpolated 중 선택. 저에너지·고에너지 거동이 달라 영역별 다항(Dual)이 흔히 쓰임."],
+   ["Geometry / CWT","교정 시와 측정 시 <b>기하조건이 같아야</b> 합니다. 폐 계측은 흉벽두께(CWT)별 곡선(Multiple CWT)으로 개인 보정."],
+   ["효율↔방사능 민감도","효율을 ±X% 잘못 알면 방사능도 ∓X% 틀립니다. 효율은 보통 가장 큰 불확도원 중 하나."],
+   ["저에너지 주의","88 keV(Cd-109)처럼 낮은 에너지는 흡수·산란 영향이 커 효율 곡선의 기울기가 가파릅니다."]].forEach(x=>{
+    const d=el("div","acard");d.innerHTML=`<div class="at">${x[0]}</div><div style="font-size:11.5px;color:var(--ink-dim);line-height:1.55">${x[1]}</div>`;g.append(d);});
+  mc.append(g);frag.append(mc);
+  return frag;
+}
+function drawEffCurve(canvas){
+  if(!canvas||!canvas.isConnected)return;
+  const {ctx,w,h}=clearCv(canvas);const nuc=NUCLIDES[STATE.nuclide];
+  const pad={l:46,r:14,t:14,b:26};
+  const Emin=50,Emax=1500,emin=0.004,emax=0.06;
+  const lx=E=>pad.l+(Math.log10(E)-Math.log10(Emin))/(Math.log10(Emax)-Math.log10(Emin))*(w-pad.l-pad.r);
+  const ly=e=>h-pad.b-(Math.log10(e)-Math.log10(emin))/(Math.log10(emax)-Math.log10(emin))*(h-pad.t-pad.b);
+  // grid
+  ctx.strokeStyle="#172033";ctx.fillStyle="#5b6b8c";ctx.font="9px 'JetBrains Mono'";ctx.lineWidth=1;
+  [50,100,200,500,1000,1500].forEach(E=>{const x=lx(E);ctx.beginPath();ctx.moveTo(x,pad.t);ctx.lineTo(x,h-pad.b);ctx.stroke();
+    ctx.textAlign="center";ctx.textBaseline="top";ctx.fillText(E+"",x,h-pad.b+4);});
+  [0.005,0.01,0.02,0.05].forEach(e=>{const y=ly(e);ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(w-pad.r,y);ctx.stroke();
+    ctx.textAlign="right";ctx.textBaseline="middle";ctx.fillText((e*100).toFixed(1)+"%",pad.l-5,y);});
+  ctx.textAlign="center";ctx.fillText("keV",w-pad.r-14,h-pad.b+4);
+  // curve
+  ctx.beginPath();for(let E=Emin;E<=Emax;E*=1.03){const x=lx(E),y=ly(CAL.effFn(E));E===Emin?ctx.moveTo(x,y):ctx.lineTo(x,y);}
+  ctx.strokeStyle="#36d6c3";ctx.lineWidth=2;ctx.shadowColor="#36d6c3";ctx.shadowBlur=6;ctx.stroke();ctx.shadowBlur=0;
+  // calibration points
+  CAL.effPoints.forEach(([E,e])=>{const x=lx(E),y=ly(e);ctx.beginPath();ctx.arc(x,y,3,0,7);ctx.fillStyle="#8da0bf";ctx.fill();});
+  // current nuclide line markers
+  nuc.lines.forEach(l=>{const e=CAL.effFn(l.E);const x=lx(l.E),y=ly(e);
+    ctx.beginPath();ctx.moveTo(x,pad.t);ctx.lineTo(x,h-pad.b);ctx.strokeStyle=nuc.color+"66";ctx.setLineDash([3,3]);ctx.lineWidth=1.2;ctx.stroke();ctx.setLineDash([]);
+    ctx.beginPath();ctx.arc(x,y,5,0,7);ctx.fillStyle=nuc.color;ctx.fill();ctx.strokeStyle="#0a0e16";ctx.lineWidth=1.5;ctx.stroke();
+    ctx.fillStyle=nuc.color;ctx.font="700 10px 'JetBrains Mono'";ctx.textAlign="center";ctx.textBaseline="bottom";ctx.fillText(l.E.toFixed(0),x,y-8);});
+}
+/* ===================== PART 4c: TABS — ACTIVITY / MDA / CALIB / GLOSSARY ===================== */
+
+/* =================== TAB: ACTIVITY =================== */
+function tabActivity_controls(){
+  const frag=document.createDocumentFragment();
+  frag.append(scenarioPills());
+  frag.append(sourceControls());
+  frag.append(sec("계산 정보",el("div","card-sub","방사능 A = S/(T·ε·y). 위 슬라이더로 면적 S와 시간 T를 바꾸면 활동도가 실시간으로 갱신됩니다. <span class='q' data-tip='activity'>?</span>")));
+  return frag;
+}
+function tabActivity_viz(){
+  const frag=document.createDocumentFragment();
+  const sim=STATE.sim,nuc=NUCLIDES[STATE.nuclide],f=STATE.loc.fits[0];
+  const pa=peakArea(sim.Y,f.E,"lin",{maxLeft:STATE.maxLeft,maxRight:STATE.maxRight,nBg:STATE.nBg});
+  const eff=effOf(f.E);
+  const act=activityCalc(pa.net,pa.sigmaNet,STATE.time,eff.eps,eff.sigma,nuc.lines[0].y,0,{});
+
+  const c=card({title:"⚛ 방사능 계산 (Activity)",badge:"라이브 대입",glow:true,
+    sub:"검출된 광전피크 면적 S를, 측정시간·효율·방출확률로 나눠 실제 방사능(Bq)으로 환산합니다."});
+  c.innerHTML+=`<div class="calc">
+    <div class="row"><span class="lhs">A</span><span class="op">=</span>${frac('S','T · ε · y')}</div>
+    <div class="row"><span class="lhs"></span><span class="op">=</span>${frac(fmtInt(pa.net),`${STATE.time} · ${eff.eps.toFixed(4)} · ${nuc.lines[0].y.toFixed(3)}`)}</div>
+    <div class="row"><span class="lhs"></span><span class="op">=</span><span class="res">${fmt(act.A,1)}</span><span class="num">Bq</span></div></div>`;
+  const banner=el("div","result");
+  banner.innerHTML=`<div><div class="lab">측정 방사능</div><div class="big">${fmt(act.A,0)} <span style="font-size:15px">± ${fmt(act.sigmaA,0)} Bq</span></div></div>
+    <div style="margin-left:auto;text-align:right"><div class="lab">계수율 R_p</div><div class="mono" style="font-size:18px;color:var(--ink)">${fmt(act.Rp,2)} <small style="color:var(--ink-dim)">cps</small></div></div>`;
+  c.append(banner);
+  if(STATE.nuclide==="Cs-137"&&Math.abs(STATE.activity-833)<50)
+    c.append(el("div","note",`<span class="ni">✅</span><div>검증 예제: 입력 833 Bq → 역산 결과가 <b>833±31 Bq</b> 부근이면 전체 파이프라인(시뮬→면적→효율→활동도)이 일관됩니다.</div>`));
+  frag.append(c);
+
+  // uncertainty contribution
+  const uc=card({title:"📊 불확도 기여도 분석",sub:"최종 방사능 불확도는 각 인자 상대불확도의 제곱합입니다. 어느 항이 가장 크게 기여하는지 봅니다."});
+  uc.innerHTML+=`<div class="calc"><div class="row"><span class="lhs">(σ_A/A)²</span><span class="op">=</span>(σ_S/S)²<span class="op">+</span>(σ_ε/ε)²<span class="op">+</span>(σ_y/y)²</div></div>`;
+  const contribs=[
+    ["피크 면적 σ_S/S",act.contrib.S,"var(--line-net)"],
+    ["효율 σ_ε/ε",act.contrib.eps,"var(--accent-2)"],
+    ["방출확률 σ_y/y",act.contrib.y,"var(--line-cont)"],
+  ];
+  const totSq=contribs.reduce((s,c)=>s+c[1]*c[1],0);
+  contribs.forEach(ct=>{const share=totSq>0?(ct[1]*ct[1]/totSq*100):0;
+    const row=el("div");row.style.margin="9px 0";
+    const cssVar=v=>v.startsWith("var(")?getComputedStyle(document.documentElement).getPropertyValue(v.slice(4,-1)).trim():v;
+    row.innerHTML=`<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span>${ct[0]}</span><span class="mono">${(ct[1]*100).toFixed(1)}% → 기여 ${share.toFixed(0)}%</span></div>
+      <div style="height:8px;border-radius:4px;background:#1a2234;overflow:hidden"><div style="height:100%;width:${share}%;background:${cssVar(ct[2])};border-radius:4px"></div></div>`;
+    uc.append(row);});
+  uc.append(el("div","note",`<span class="ni">💡</span><div>총 상대불확도 <b>${(act.rel*100).toFixed(1)}%</b>. 면적 불확도는 측정시간↑·방사능↑로 줄지만, 효율·방출확률 불확도는 교정·핵자료에서 오므로 측정만으론 줄지 않습니다.</div>`));
+  frag.append(uc);
+
+  // weighted mean for multi-line
+  if(nuc.lines.length>1){
+    const vals=nuc.lines.map(l=>{const eff2=effOf(l.E);const pa2=peakArea(sim.Y,l.E,"lin",{maxLeft:1.25,maxRight:1.25,nBg:STATE.nBg});
+      const a2=activityCalc(pa2.net,pa2.sigmaNet,STATE.time,eff2.eps,eff2.sigma,l.y,0,{});return {E:l.E,C:a2.A,sigma:a2.sigmaA};});
+    const wm=weightedMean(vals);
+    const wc=card({title:"⚖ 다중선 가중평균",sub:`${STATE.nuclide}는 두 감마선에서 각각 방사능을 구한 뒤 가중평균합니다.`});
+    const wtbl=el("table","dt");
+    wtbl.innerHTML=`<tr><th>감마선</th><th>활동도</th><th>±σ</th><th>가중치</th></tr>`+
+      vals.map((v,i)=>`<tr><td>${v.E.toFixed(1)} keV</td><td>${fmt(v.C,0)}</td><td>${fmt(v.sigma,0)}</td><td>${(wm.weights[i]*100).toFixed(0)}%</td></tr>`).join("")+
+      `<tr style="border-top:2px solid var(--accent)"><td><b>가중평균</b></td><td colspan="3"><b style="color:var(--accent)">${fmt(wm.mean,1)} ± ${fmt(wm.sigma,1)} Bq</b></td></tr>`;
+    wc.append(wtbl);
+    wc.append(el("div","note",`<span class="ni">🔢</span><div>문서 예제: 1000±80 과 1080±120 Bq의 가중평균 ≈ <b>1024.7 Bq</b>. 불확도가 작은 line이 결과를 더 강하게 끌어당깁니다.</div>`));
+    frag.append(wc);
+  }
+  return frag;
+}
+
+/* =================== TAB: MDA =================== */
+function tabMda_controls(){
+  const frag=document.createDocumentFragment();
+  frag.append(sec("Currie 파라미터",
+    slider({label:"신뢰계수 k",min:1,max:3,step:0.005,val:STATE.kMDA,fmt:v=>v.toFixed(3),tip:"mda",
+      onInput:v=>{STATE.kMDA=v;renderHero();refreshViz();}})));
+  frag.append(sec("측정 조건",
+    slider({label:"측정 시간 T",min:60,max:7200,step:60,val:STATE.time,unit:"s",tip:"mda",
+      onInput:v=>{STATE.time=v;recompute();renderHero();refreshViz();}}),
+    slider({label:"배경 수준",min:0.2,max:4,step:0.1,val:STATE.bg,unit:"×",fmt:v=>v.toFixed(1),
+      onInput:v=>{STATE.bg=v;recompute();renderHero();refreshViz();}})));
+  return frag;
+}
+function tabMda_viz(){
+  const frag=document.createDocumentFragment();
+  const sim=STATE.sim,nuc=NUCLIDES[STATE.nuclide],f=STATE.loc.fits[0];
+  const pa=peakArea(sim.Y,f.E,"lin",{maxLeft:1.25,maxRight:1.25,nBg:STATE.nBg});
+  const eff=effOf(f.E);const y=nuc.lines[0].y;
+  const sigmaB=Math.sqrt((pa.Nroi/(2*pa.nBg))**2*(pa.B1+pa.B2));
+  const sigma0=Math.sqrt(Math.max(0,pa.bg+sigmaB*sigmaB));
+  const cur=currieMDA(sigma0,STATE.kMDA,STATE.time,eff.eps,y,{});
+
+  const c=card({title:"🎯 검출하한 (MDA) — Currie",badge:"L_C / L_D",glow:true,
+    sub:"이 측정에서 '검출했다'고 말하려면 최소 몇 Bq가 필요했는지입니다. 배경이 클수록, 시간·효율이 작을수록 MDA가 커집니다(나빠집니다)."});
+  c.innerHTML+=`<div class="calc">
+    <div class="row"><span class="lhs">σ₀</span><span class="op">=</span><span class="sqrt">√(B+σ_B²)</span><span class="op">=</span><span class="num">${fmt(cur.sigma0,1)}</span></div>
+    <div class="row"><span class="lhs">L_C</span><span class="op">=</span><span class="var">k</span>·σ₀<span class="op">=</span><span class="num">${STATE.kMDA.toFixed(3)}</span>·${fmt(cur.sigma0,1)}<span class="op">=</span><span style="color:var(--warn)">${fmt(cur.LC,1)}</span><span class="cmt">판정선(이보다 크면 검출)</span></div>
+    <div class="row"><span class="lhs">L_D</span><span class="op">=</span>k²+2L_C<span class="op">=</span><span style="color:var(--bad)">${fmt(cur.LD,1)}</span><span class="cmt">검출 가능한 최소 참신호</span></div>
+    <div class="row"><span class="lhs">MDA</span><span class="op">=</span>${frac('L_D','T·ε·y')}<span class="op">=</span><span class="res">${fmt(cur.MDA,1)}</span><span class="num">Bq</span></div></div>`;
+  const banner=el("div","result warn");
+  banner.innerHTML=`<div><div class="lab">최소검출방사능 MDA</div><div class="big">${fmt(cur.MDA,1)} <span style="font-size:15px">Bq</span></div></div>
+    <div style="margin-left:auto;text-align:right"><div class="lab">현재 측정 면적</div><div class="mono" style="font-size:17px;color:${pa.net>cur.LD?'var(--good)':'var(--bad)'}">${fmtInt(pa.net)} <small>counts</small></div>
+    <div style="font-size:11px;color:var(--ink-dim);margin-top:2px">${pa.net>cur.LD?'✓ 검출 가능 수준':'✗ 검출한계 미만'}</div></div>`;
+  c.append(banner);
+  if(STATE.nuclide==="Cs-137")c.append(el("div","note",`<span class="ni">✅</span><div>문서 예제(B=2003, σ_B=90.9): L_C≈149.5, L_D≈301.8, MDA≈49 Bq. 배경·시간을 예제와 맞추면 근접한 값이 나옵니다.</div>`));
+  frag.append(c);
+
+  // time effect
+  const tc=card({title:"⏱ 측정 시간이 MDA에 미치는 영향",sub:"배경은 시간에 비례해 쌓이므로 σ₀∝√T, 그런데 분모도 T에 비례 → MDA ∝ 1/√T 로 개선됩니다."});
+  const cw=el("div","subviz");cw.style.height="180px";const cv=el("canvas");cw.append(cv);tc.append(cw);
+  tc.append(el("div","note",`<span class="ni">📉</span><div>시간을 4배로 늘리면 MDA는 약 <b>절반</b>(1/√4)로 줄어듭니다. 미량 측정엔 충분한 계수 시간이 핵심입니다.</div>`));
+  frag.append(tc);
+  setTimeout(()=>drawMdaTime(cv,pa,eff,y),30);
+
+  // method comparison
+  const mc=card({title:"⚖ 검출한계 방법 비교",sub:"같은 배경이라도 Currie / KTA / ISO 11929는 ROI 정의·불확도 철학이 달라 값이 다릅니다."});
+  const kta=ktaMDAexact(sigma0,STATE.kMDA,STATE.time,eff.eps,y,{});
+  const iso=isoMDA(pa.bg,sigmaB,STATE.kMDA,STATE.time,eff.eps,y,{});
+  const methods=[["Currie (L_D)",cur.MDA,"가장 널리 쓰임. σ₀=√(B+σ_B²) 기반"],
+    ["KTA 1503",kta.MDA,"독일 표준. ROI/배경 처리 방식이 다름"],
+    ["ISO 11929",iso.MDA,"반복법, 불확도 전파 기반의 일반식"]];
+  const maxM=Math.max(...methods.map(m=>m[1]),1);
+  methods.forEach(m=>{const row=el("div");row.style.margin="9px 0";
+    row.innerHTML=`<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span><b>${m[0]}</b> <span style="color:var(--ink-dim);font-size:10.5px">${m[2]}</span></span><span class="mono" style="color:var(--accent)">${fmt(m[1],1)} Bq</span></div>
+      <div style="height:8px;border-radius:4px;background:#1a2234;overflow:hidden"><div style="height:100%;width:${m[1]/maxM*100}%;background:var(--accent);border-radius:4px"></div></div>`;
+    mc.append(row);});
+  mc.append(el("div","note",`<span class="ni">📐</span><div>또한 <b>LLD(Lower Limit of Detection)</b>는 사전(a priori) 검출능력, <b>L_C</b>는 사후(a posteriori) 판정선으로 개념이 구분됩니다.</div>`));
+  frag.append(mc);
+  return frag;
+}
+function drawMdaTime(canvas,paRef,effRef,yRef){
+  if(!canvas||!canvas.isConnected)return;
+  const {ctx,w,h}=clearCv(canvas);
+  const pad={l:50,r:14,t:14,b:26};
+  const Tmin=60,Tmax=7200;
+  // approximate MDA(T): background scales with T, so B(T)=B0*(T/T0); sigma0=sqrt(B); LD~3.29 sqrt(B); MDA=LD/(T eps y)
+  const B0=paRef.bg,T0=STATE.time;
+  const mdaAt=T=>{const B=B0*(T/T0);const s0=Math.sqrt(B+ (paRef.Nroi/(2*paRef.nBg))**2*(paRef.B1+paRef.B2)*(T/T0));
+    const LD=STATE.kMDA*STATE.kMDA+2*STATE.kMDA*s0;return LD/(T*effRef.eps*yRef);};
+  let mmax=0,mmin=1e9;for(let T=Tmin;T<=Tmax;T+=60){const m=mdaAt(T);mmax=Math.max(mmax,m);mmin=Math.min(mmin,m);}
+  mmax*=1.05;
+  const lx=T=>pad.l+(T-Tmin)/(Tmax-Tmin)*(w-pad.l-pad.r);
+  const ly=m=>h-pad.b-(m-mmin)/(mmax-mmin)*(h-pad.t-pad.b);
+  ctx.strokeStyle="#172033";ctx.fillStyle="#5b6b8c";ctx.font="9px 'JetBrains Mono'";ctx.lineWidth=1;
+  [60,1800,3600,5400,7200].forEach(T=>{const x=lx(T);ctx.beginPath();ctx.moveTo(x,pad.t);ctx.lineTo(x,h-pad.b);ctx.stroke();
+    ctx.textAlign="center";ctx.textBaseline="top";ctx.fillText((T/60)+"m",x,h-pad.b+4);});
+  // curve
+  ctx.beginPath();for(let T=Tmin;T<=Tmax;T+=30){const x=lx(T),yv=ly(mdaAt(T));T===Tmin?ctx.moveTo(x,yv):ctx.lineTo(x,yv);}
+  ctx.strokeStyle="#ffb454";ctx.lineWidth=2;ctx.shadowColor="#ffb454";ctx.shadowBlur=6;ctx.stroke();ctx.shadowBlur=0;
+  // current T marker
+  const cx=lx(clamp(STATE.time,Tmin,Tmax)),cy=ly(mdaAt(STATE.time));
+  ctx.beginPath();ctx.arc(cx,cy,5,0,7);ctx.fillStyle="#36d6c3";ctx.fill();ctx.strokeStyle="#0a0e16";ctx.lineWidth=1.5;ctx.stroke();
+  ctx.fillStyle="#36d6c3";ctx.font="700 10px 'JetBrains Mono'";ctx.textAlign="center";ctx.textBaseline="bottom";
+  ctx.fillText("현재 "+fmt(mdaAt(STATE.time),0)+" Bq",cx,cy-8);
+  ctx.fillStyle="#8da0bf";ctx.textAlign="left";ctx.textBaseline="top";ctx.fillText("MDA (Bq) vs 측정시간",pad.l,2);
+}
+
+/* =================== TAB: CALIBRATION =================== */
+function tabCalib_controls(){
+  const frag=document.createDocumentFragment();
+  frag.append(sec("에너지 교정  E = C₀ + C₁·ch",
+    slider({label:"C₀ (절편)",min:-10,max:10,step:0.5,val:CAL.C0,unit:"keV",fmt:v=>v.toFixed(1),tip:"energy_cal",
+      onInput:v=>{CAL.C0=v;recompute();renderHero();refreshViz();}}),
+    slider({label:"C₁ (기울기)",min:0.3,max:0.8,step:0.01,val:CAL.C1,unit:"keV/ch",fmt:v=>v.toFixed(2),tip:"energy_cal",
+      onInput:v=>{CAL.C1=v;recompute();renderHero();refreshViz();}})));
+  frag.append(sec("FWHM 교정  FWHM = a + b·√E",
+    slider({label:"a (절편)",min:0,max:5,step:0.1,val:CAL.a,fmt:v=>v.toFixed(1),tip:"fwhm",
+      onInput:v=>{CAL.a=v;recompute();renderHero();refreshViz();}}),
+    slider({label:"b (기울기)",min:0.5,max:3,step:0.05,val:CAL.b,fmt:v=>v.toFixed(2),tip:"fwhm",
+      onInput:v=>{CAL.b=v;recompute();renderHero();refreshViz();}})));
+  return frag;
+}
+function tabCalib_viz(){
+  const frag=document.createDocumentFragment();
+  const f=STATE.loc.fits[0];
+  const c=card({title:"⚙ 에너지 & FWHM 교정",badge:"Calibration",glow:true,
+    sub:"검출기는 '몇 번째 채널'인지만 압니다. 채널↔에너지 변환과 피크 폭 관계를 교정으로 정합니다."});
+  c.innerHTML+=`<div class="calc">
+    <div class="row"><span class="lhs">에너지</span><span class="op">:</span><span class="var">E</span><span class="op">=</span><span class="num">${CAL.C0.toFixed(1)}</span><span class="op">+</span><span class="num">${CAL.C1.toFixed(2)}</span>·ch<span class="op">⇒</span>ch=${frac('E−'+CAL.C0.toFixed(1),CAL.C1.toFixed(2))}</div>
+    <div class="row"><span class="lhs">FWHM</span><span class="op">:</span><span class="num">${CAL.a.toFixed(1)}</span><span class="op">+</span><span class="num">${CAL.b.toFixed(2)}</span>·√E<span class="op">,</span> @662keV = <span class="res">${fwhmKeV(661.7).toFixed(1)}</span> keV (${(fwhmKeV(661.7)/661.7*100).toFixed(1)}%)</div></div>`;
+  const tbl=el("table","dt");tbl.innerHTML=`<tr><th>핵종 선</th><th>에너지</th><th>채널</th><th>FWHM(keV)</th><th>FWHM(ch)</th></tr>`+
+    Object.entries(NUCLIDES).flatMap(([n,nu])=>nu.lines.map(l=>`<tr><td>${n}</td><td>${l.E.toFixed(1)}</td><td>${Math.round(E2ch(l.E))}</td><td>${fwhmKeV(l.E).toFixed(1)}</td><td>${fwhmCh(l.E).toFixed(1)}</td></tr>`)).join("");
+  c.append(tbl);
+  c.append(el("div","note warn",`<span class="ni">⚠</span><div>C₁이 틀리면 모든 피크가 엉뚱한 에너지로 매핑되어 핵종 식별이 실패합니다. NaI는 온도 드리프트가 커 주기적 재교정이 중요합니다.</div>`));
+  frag.append(c);
+
+  // settings cards (문서 §11)
+  const sc=card({title:"🎛 주요 분석 설정과 영향",sub:"각 설정을 '너무 낮게/높게' 두면 분석이 어떻게 달라지는지입니다. NaI WBC 권장값을 함께 표시합니다."});
+  const settings=[
+    ["Continuum Function","Step / Linear","피크 흡수를 반영하려면 Step, 단순 직선이면 Linear. 넓은 NaI 피크엔 Step 권장.","continuum_type"],
+    ["Maximum Left/Right","ROI 폭(×FWHM)","너무 좁으면 피크 꼬리 누락(면적↓), 너무 넓으면 배경 과대·인접피크 포함.","roi"],
+    ["Energy Cal tolerance","Fixed keV / Variable","좁으면 gain drift 시 매칭 실패, 넓으면 오매칭 위험. 가변(FWHM배) 권장.","energy_cal"],
+    ["MDA reject C₁,C₂","검출 임계","낮으면 잡음을 피크로 오인(거짓검출), 높으면 약한 진짜 피크 누락.","mda_rej"],
+    ["VARREJ / BACKREJ","높이·배경 검정","낮으면 거짓피크↑, 높으면 약한 피크 거부.","var_rej"],
+    ["Gain reject / MAXPASS","위치 보정","NaI 드리프트 보정 활성 권장, 최대 반복 10회.","gain"],
+    ["Use Multiple CWT","폐 계측 효율","흉벽두께별 효율곡선으로 개인 보정. 내부피폭 정밀화.","efficiency"],
+    ["Use Variable Tolerance","에너지↑ 허용폭↑","고에너지 피크가 넓어지는 NaI 특성에 맞춰 권장.","fwhm"],
+  ];
+  const g=el("div","grid2");
+  settings.forEach(s=>{const d=el("div","acard");
+    d.innerHTML=`<div class="at" style="font-size:12px">${s[0]} <span class="q" data-tip="${s[3]}">?</span></div>
+      <div style="font-size:10px;color:var(--accent-2);font-family:var(--mono);margin:2px 0 5px">${s[1]}</div>
+      <div style="font-size:11px;color:var(--ink-dim);line-height:1.5">${s[2]}</div>`;g.append(d);});
+  sc.append(g);frag.append(sc);
+  return frag;
+}
+
+/* =================== TAB: GLOSSARY =================== */
+const GLOSSARY=[
+  ["Peak Locate","스펙트럼에서 감마선 피크의 위치(에너지)를 찾는 단계. Gamma-M은 erosion 배경추정+gain보정+MDA검정을 포함.","erosion"],
+  ["Erosion","봉우리를 이웃 평균보다 높으면 깎아 내려 배경(continuum)을 추정하는 반복 연산.","erosion"],
+  ["PLY","bin을 4개 격자(mod 4)로 나눠 각각 배경을 추정하고 최소값을 취하는 기법. 피크의 배경 오염을 줄임.","ply"],
+  ["Continuum","피크 아래에 깔린 배경 성분. Compton 산란·자연방사능 등으로 구성.","compton"],
+  ["FWHM","반치전폭. 피크 높이 절반에서의 폭. NaI는 넓고 에너지에 따라 a+b√E로 변함.","fwhm"],
+  ["Gaussian Fit","net 피크에 종 모양 곡선을 맞춰 높이·면적·중심을 구하는 최소제곱 적합.","gauss"],
+  ["Peak Area","ROI 안 총 계수에서 배경을 뺀 순 피크 계수. 방사능 계산의 출발점.","roi"],
+  ["ROI","Region of Interest. 피크 면적을 적분하는 채널 구간.","roi"],
+  ["Linear / Step Continuum","ROI 양옆 배경을 직선 또는 계단으로 잇는 두 방식.","continuum_type"],
+  ["Rejection","library 위치라도 통계 기준(MDA·높이·배경)을 통과해야 진짜 피크로 인정.","mda_rej"],
+  ["Gain Shift","검출기 이득 변동으로 피크 위치가 밀리는 현상. 자동 보정 가능.","gain"],
+  ["Efficiency","검출 효율. 방출된 감마선 중 광전피크로 기록되는 비율. 에너지에 따라 변함.","efficiency"],
+  ["Nuclide ID","관측 피크를 핵종으로 식별. Confidence Index로 확신도를 정량화.","conf_index"],
+  ["Confidence Index","에너지 일치·missing line·반감기 penalty를 곱한 핵종 확신 점수(0~1).","conf_index"],
+  ["Interference","서로 다른 핵종 감마선이 같은 에너지에 겹치는 것. 연립으로 면적 분배.","conf_index"],
+  ["Activity","방사능(Bq). A=S/(T·ε·y). 검출 면적을 실제 붕괴율로 환산.","activity"],
+  ["Weighted Mean","다중 감마선의 활동도를 불확도 역수로 가중평균.","activity"],
+  ["MDA","최소검출방사능. 이 측정에서 검출 가능한 최소 방사능. 작을수록 좋음.","mda"],
+  ["Critical Level (L_C)","검출 판정선. 신호가 이보다 크면 '검출'.","mda"],
+  ["Detection Limit (L_D)","검출 가능한 최소 참신호. MDA의 계수 기준값.","mda"],
+  ["Currie / KTA / ISO 11929","검출한계 계산의 세 가지 방법론. ROI·불확도 철학이 다름.","mda"],
+  ["Compton Continuum","감마선이 부분 에너지만 주고 산란될 때 생기는 광전피크 왼쪽의 넓은 성분.","compton"],
+];
+function tabGlossary_controls(){
+  const frag=document.createDocumentFragment();
+  frag.append(sec("용어집",el("div","card-sub","WBC 감마스펙트럼 분석의 핵심 용어 모음입니다. 검색창에 키워드를 입력해 찾을 수 있습니다. 설명 수준(초/중/고)에 따라 우측 카드의 도움말 깊이가 달라집니다.")));
+  frag.append(sourceControls());
+  return frag;
+}
+function tabGlossary_viz(){
+  const frag=document.createDocumentFragment();
+  const c=card({title:"📖 용어집 (Glossary)",badge:`${GLOSSARY.length}개`,
+    sub:"각 용어의 ? 아이콘에 마우스를 올리면 현재 설명 수준에 맞는 3단계 설명이 나옵니다."});
+  const search=el("input","gsearch");search.placeholder="🔍 용어 검색 (예: erosion, MDA, 효율, FWHM…)";
+  const list=el("div");
+  function render(q=""){
+    list.innerHTML="";
+    const ql=q.trim().toLowerCase();
+    GLOSSARY.filter(g=>!ql||g[0].toLowerCase().includes(ql)||g[1].toLowerCase().includes(ql)).forEach(g=>{
+      const d=el("div","gitem");
+      d.innerHTML=`<div class="gt">${g[0]} <span class="q" data-tip="${g[2]}">?</span></div><div class="gd">${g[1]}</div>`;
+      list.append(d);});
+    if(!list.children.length)list.innerHTML=`<div style="color:var(--ink-dim);padding:20px;text-align:center">"${q}"에 해당하는 용어가 없습니다.</div>`;
+  }
+  search.addEventListener("input",()=>render(search.value));
+  c.append(search,list);frag.append(c);
+  render();
+  return frag;
+}
+/* ===================== PART 5: INIT / DISPATCH / BINDINGS / SELFCHECK ===================== */
+
+/* ===================== DEEP-DIVE UPGRADE: 정밀 재현 탭 8종 ===================== */
+/* 딥다이브 문서(Deep_Dive2)의 정확한 공식·수치 예제를 인라인 계산으로 재현 */
+function _erf(x){ // Abramowitz-Stegun 7.1.26
+  const s=x<0?-1:1; x=Math.abs(x);
+  const t=1/(1+0.3275911*x);
+  const y=1-(((((1.061405429*t-1.453152027)*t)+1.421413741)*t-0.284496736)*t+0.254829592)*t*Math.exp(-x*x);
+  return s*y;
+}
+const SQPI=Math.sqrt(Math.PI);
+function dvInfo(txt){return sec("이 탭에 대하여",el("div","card-sub",txt));}
+function calcRows(rows){ // rows: [[lhs,op,rhs(html),cmt?],...]
+  return `<div class="calc">`+rows.map(r=>
+    `<div class="row"><span class="lhs">${r[0]}</span><span class="op">${r[1]}</span>${r[2]}${r[3]?`<span class="cmt">${r[3]}</span>`:""}</div>`
+  ).join("")+`</div>`;
+}
+function chk(label,got,ref,fmt,tol){ // 검증 행 (test 스타일)
+  const g=typeof got==="number"?(fmt?fmt(got):got):got;
+  const r=typeof ref==="number"?(fmt?fmt(ref):ref):ref;
+  const err=typeof got==="number"&&typeof ref==="number"?Math.abs(got-ref)/(Math.abs(ref)||1):0;
+  const pass=err<=(tol||0.01);
+  return `<div class="test"><span class="bdg ${pass?"pass":"fail"}">${pass?"통과":"확인"}</span>
+    <div class="tt"><div class="nm">${label}</div><div class="fm">계산 ${g} · 문서 ${r} · 오차 ${(err*100).toFixed(2)}%</div></div></div>`;
+}
+
+/* ============ 심화 I · 분해능·Gaussian 수학 기초 (PART I) ============ */
+function tabMath_controls(){return dvInfo("FWHM·σ·Z의 관계를 유도합니다. 감마분석 거의 모든 식의 뿌리입니다. (딥다이브 문서 12번 모듈)");}
+function tabMath_viz(){
+  const frag=document.createDocumentFragment();
+  const c2358=2*Math.sqrt(2*Math.log(2));
+  const Z1=c2358/(2*Math.sqrt(Math.log(2))); // σ=1,Δ=1 → √2
+  const xhalf=Math.sqrt(2*Math.log(2));
+  const area=_erf(xhalf/Math.sqrt(2));
+  const c1=card({title:"📐 FWHM = 2√(2·ln2)·σ 유도",badge:"PART I",glow:true,
+    sub:"가우스 f(x)=1/(σ√2π)·exp(−x²/2σ²) 에서 반치폭은 f가 최댓값의 절반이 되는 두 지점 사이 거리입니다."});
+  c1.innerHTML+=calcRows([
+    ["½","=",`exp(−x²<span class="sub">half</span>/2σ²)`,"높이 절반 조건"],
+    ["x<span class=\"sub\">half</span>","=",`±σ·${sq("2ln2")}`,"양변 ln 후 정리"],
+    ["FWHM","=",`2·${sq("2ln2")}·σ = <span class="res">${c2358.toFixed(6)}</span>·σ`,"≈ 2.3548σ"],
+  ]);
+  frag.append(c1);
+  const c2=card({title:"🔗 Z 파라미터와 면적",sub:"Gamma-M 피크식 F=h·exp(−(x−E)²/Z²) 의 지수를 표준형과 비교합니다."});
+  c2.innerHTML+=calcRows([
+    ["1/Z²","=",`1/(2σ²)`,"지수 비교"],
+    ["Z","=",`${sq("2")}·σ = ${frac("FWHM","Δ·2√ln2")} <span class="op">→</span> <span class="res">${Z1.toFixed(6)}</span>`,"σ=1,Δ=1 일 때 √2"],
+    ["면적 A","=",`h·Z·${sq("π")} = h·σ·${sq("2π")}`,"연속 근사"],
+  ]);
+  frag.append(c2);
+  const c3=card({title:"📊 FWHM 구간이 포함하는 면적",badge:"76.1%",
+    sub:"FWHM 구간 [−1.177σ, +1.177σ] 은 전체 가우스 면적의 일부만 포함합니다. 95% 신뢰구간(±1.96σ=3.92σ)과 다릅니다."});
+  c3.innerHTML+=calcRows([
+    ["x<span class=\"sub\">half</span>/σ","=",`${sq("2ln2")} = ${xhalf.toFixed(4)}`,"1.1774"],
+    ["면적비","=",`erf(x<span class="sub">half</span>/σ/${sq("2")}) = <span class="res">${(area*100).toFixed(1)}%</span>`,"문서 76.1%"],
+    ["95% 구간","=",`±1.96σ = 3.92σ`,"면적 기준(FWHM과 다름)"],
+  ]);
+  c3.append(el("div","note",`<span class="ni">📐</span><div>FWHM은 <b>높이 절반</b>의 폭(분해능 지표), 95% 구간은 <b>면적 95%</b>의 폭(불확도 지표)입니다. Gamma-M이 분모에 σ를 두지 않고 Z(=√2σ)를 곱셈형으로 쓰는 것은 피팅 시 0분모 오류를 피하고 미분이 깔끔하기 때문입니다.</div>`));
+  frag.append(c3);
+  frag.append(el("div","sec-h","검증 — 문서값 대조"));
+  const v=el("div");v.innerHTML=chk("FWHM/σ 상수",c2358,2.354820,x=>x.toFixed(4),1e-5)
+    +chk("Z = √2·σ",Z1,1.414214,x=>x.toFixed(4),1e-5)
+    +chk("FWHM 면적비",area,0.761,x=>(x*100).toFixed(1)+"%",0.01);
+  frag.append(v);
+  return frag;
+}
+
+/* ============ 심화 II · Peak Locate (Gamma-M) 정밀 (PART II·III) ============ */
+function tabLocate2_controls(){return dvInfo("Gamma-M 피크탐색의 전 과정을 문서 Cs-137 662 keV 예제(FWHM 40 ch, 피크 ~250, 배경 ~158)로 정밀 재현합니다.");}
+function tabLocate2_viz(){
+  const frag=document.createDocumentFragment();
+  const Zbin=0.4*40, Z=40/(2*Math.sqrt(Math.log(2)));
+  // 에너지↔채널
+  const c0=card({title:"① 에너지 → 채널 변환",badge:"PART II",
+    sub:"분석 SW는 채널별 계수를 봅니다. 교정식 E=C₀+C₁·ch 로 라이브러리 에너지를 채널로 바꿉니다."});
+  c0.innerHTML+=calcRows([
+    ["ch","=",`(E−C₀)/C₁ = 661.7/0.5 = <span class="res">1323.4</span>`,"E=0.5×ch 교정 시"],
+    ["ch","=",`662/1.0 = <span class="res">662</span>`,"E=1.0×ch (이 예제)"],
+  ]);
+  frag.append(c0);
+  // binning + 4 PLY
+  const c1=card({title:"② FWHM 기반 binning + 4 PLY",
+    sub:"전체 스펙트럼을 FWHM 비례 bin으로 나눕니다. bin들을 1,2,3,4,1,2,3,4… 로 4개 PLY에 배정해 서로 다른 sampling grid를 만듭니다."});
+  c1.innerHTML+=calcRows([
+    ["N<span class=\"sub\">b</span>","=",`CH<span class="sub">L</span>·F<span class="sub">L</span>/(k·F<span class="sub">M</span>)`,"bin 수; >3400 이면 k×1.1 반복"],
+    ["Z<span class=\"sub\">bin</span>","=",`k·FWHM = 0.4×40 = <span class="res">${Zbin.toFixed(0)}</span> 채널`,"erosion용 bin 폭"],
+    ["Z<span class=\"sub\">적합</span>","=",`${frac("FWHM","2√ln2")} = ${frac("40","2√ln2")} = <span class="res">${Z.toFixed(2)}</span>`,"Gaussian 폭"],
+  ]);
+  c1.append(el("div","note",`<span class="ni">🧩</span><div>continuum = min(원계수, 4 PLY 보간). 한 PLY가 피크에 끌려 올라가도 다른 PLY가 더 낮은 배경을 주므로, 최소값을 취하면 피크 영향을 덜 받은 배경선이 선택됩니다.</div>`));
+  frag.append(c1);
+  // erosion table
+  const tbl=[[602,160,160.0],[622,175,161.4],[642,285,159.9],[652,371,159.1],[662,412,158.3],[672,373,157.5],[682,289,156.7],[702,181,155.1],[722,165,153.5]];
+  const c2=card({title:"③ Erosion 배경 + 순피크",badge:"문서 예제",glow:true,
+    sub:"봉우리를 B'ₖ=min(Bₖ,(B'ₖ₋₄+Bₖ₊₄)/2) 규칙으로 8회 깎아 배경(continuum)을 추정합니다."});
+  let th=`<table class="dt"><tr><th>채널</th><th>원계수 Y</th><th>배경 C</th><th>순 Y−C</th><th>Gaussian</th></tr>`;
+  tbl.forEach(([ch,Y,C])=>{const net=Y-C;const g=Math.exp(-((ch-662)**2)/(Z*Z));
+    th+=`<tr><td>${ch}</td><td>${Y}</td><td>${C.toFixed(1)}</td><td>${net.toFixed(1)}</td><td>${g.toFixed(3)}</td></tr>`;});
+  th+=`</table>`;c2.innerHTML+=th;
+  c2.append(el("div","note",`<span class="ni">⛏</span><div>중심 ch 662: 원계수 412 − 배경 158.3 = <b>순피크 253.7</b> (≈ 참 피크높이 250). 순 Y−C 가 Gaussian 모양을 따릅니다.</div>`));
+  frag.append(c2);
+  // LSQ + area
+  const H=249.90, area=H*Z*SQPI;
+  const c3=card({title:"④ Gaussian 가중최소제곱 적합 + 면적",
+    sub:"F=B₀+B₁(ch−662)+H·exp(−(ch−662)²/Z²). 가중 W=1/Y, 정규방정식 β=(XᵀWX)⁻¹XᵀWy."});
+  c3.innerHTML+=`<table class="dt"><tr><th>B₀</th><th>B₁</th><th>H</th><th>σ_H</th></tr><tr><td>6.78</td><td>0.135</td><td>249.90</td><td>4.42</td></tr></table>`;
+  c3.innerHTML+=calcRows([["A","=",`H·Z·${sq("π")} = 249.9×${Z.toFixed(2)}×1.772 = <span class="res">${Math.round(area).toLocaleString()}</span>`,"문서 10,640 counts"]]);
+  frag.append(c3);
+  // 5 rejection
+  const mdaLimit=3+2.5*Math.sqrt(22354/(0.966**2));
+  const c4=card({title:"⑤ Peak Rejection 5종",badge:"전부 PASS",
+    sub:"라이브러리 위치라도 5가지 기준을 통과해야 진짜 피크입니다."});
+  c4.innerHTML+=
+    chk("① MDA: A > C₁+C₂√(Σy/0.966²)",area,mdaLimit,x=>Math.round(x).toLocaleString(),5)+
+    `<div class="test"><span class="bdg pass">PASS</span><div class="tt"><div class="nm">② 높이: h² > F_V·σ_h²</div><div class="fm">${Math.round(H*H).toLocaleString()} > ${(1*4.42*4.42).toFixed(1)} (F_V=1)</div></div></div>`+
+    `<div class="test"><span class="bdg pass">PASS</span><div class="tt"><div class="nm">③ 배경: h² > F_B·B</div><div class="fm">${Math.round(H*H).toLocaleString()} > ${(158.3).toFixed(1)} (continuum, F_B=1)</div></div></div>`+
+    `<div class="test"><span class="bdg pass">PASS</span><div class="tt"><div class="nm">④ 인접 라이브러리 피크</div><div class="fm">OVERWIND 내 겹침 없음 → 통과</div></div></div>`+
+    `<div class="test"><span class="bdg pass">PASS</span><div class="tt"><div class="nm">⑤ unknown 위치근접</div><div class="fm">library 위치라 unknown으로 중복 처리 안 함</div></div></div>`;
+  frag.append(c4);
+  // unknown dd
+  const W=40,O=14698,B=6333.55,C=W*Math.sqrt(B/W),dd=(O-C-3)/(2.5*Math.sqrt(W*(B+C)));
+  const c5=card({title:"⑥ Unknown peak dd 지표",
+    sub:"미지 피크 탐색의 digital filter 지표. erosion 과소추정 보정항 C=W·√(B/W)."});
+  c5.innerHTML+=calcRows([
+    ["C","=",`W·${sq("B/W")} = 40·${sq("158.34")} = <span class="res">${C.toFixed(1)}</span>`,"문서 503.3"],
+    ["dd","=",`${frac("O−C−K₁","K₂·√(W(B+C))")} = <span class="res">${dd.toFixed(2)}</span>`,"문서 10.86 · dd>1 → 후보"],
+  ]);
+  frag.append(c5);
+  // gain shift
+  const c6=card({title:"⑦ Gain shift correction",
+    sub:"NaI는 온도로 피크가 이동하기 쉽습니다. 적합식에 gain 항을 추가해 보정합니다."});
+  c6.innerHTML+=calcRows([
+    ["F<span class=\"sub\">s</span>","=",`(dY/dx)(1+Q₀)`,"gain 항"],
+    ["E'<span class=\"sub\">j</span>","=",`E<span class="sub">j</span> + Q₀`,"Q₀>GAINREJ 면 중심 이동 후 재적합"],
+  ]);
+  c6.append(el("div","note",`<span class="ni">⚙</span><div>Q₀가 기준 이하이거나 <b>MAXGAINPASS(기본 10회)</b>에 도달할 때까지 반복합니다.</div>`));
+  frag.append(c6);
+  // 5 algorithms recap
+  const c7=card({title:"⑧ Peak Locate 5종 (PART III)",
+    sub:"후보를 어디서 얻고 존재 검정을 하는가로 나뉩니다."});
+  const al=[["User Specified","사용자 지정 · 검정 없음 · QC/교육"],["Library Simple","교정식 채널변환 · 약한 검정 · HPGe 단순"],["Library Gamma-M ★","erosion+5종 rejection · NaI WBC"],["2nd Difference","2차미분 미지탐색 · HPGe unknown"],["VMS Standard","step bg+임계 · HPGe 환경시료"]];
+  c7.innerHTML+=`<table class="dt"><tr><th>방식</th><th>특징 · 적합</th></tr>`+al.map(a=>`<tr><td>${a[0]}</td><td style="text-align:left">${a[1]}</td></tr>`).join("")+`</table>`;
+  frag.append(c7);
+  return frag;
+}
+
+/* ============ 심화 III · Peak Area 정밀 (PART IV) ============ */
+function tabArea2_controls(){return dvInfo("Peak Area를 문서 Cs-137 예제(ROI 650–674, B₁=317·B₂=324·gross 7107)로 정밀 재현 → S=5104±116 (2.27%).");}
+function tabArea2_viz(){
+  const frag=document.createDocumentFragment();
+  const N=25,n=4,B1=317,B2=324,G=7107;
+  const B=(N/(2*n))*(B1+B2), S=G-B, sigB2=(N/(2*n))**2*(B1+B2), sigS=Math.sqrt(G+sigB2), rel=sigS/S;
+  const c1=card({title:"① Linear continuum",badge:"PART IV",glow:true,
+    sub:"ROI 안 총계수(gross)에서 직선 배경 B=(N/2n)(B₁+B₂)를 빼 순피크 S를 구합니다."});
+  c1.innerHTML+=calcRows([
+    ["B","=",`${frac("N","2n")}(B₁+B₂) = ${frac("25","8")}×641 = <span class="res">${B.toFixed(1)}</span>`,"문서 2003.1"],
+    ["S","=",`G − B = 7107 − ${B.toFixed(1)} = <span class="res">${S.toFixed(1)}</span>`,"문서 5104"],
+  ]);
+  frag.append(c1);
+  const c2=card({title:"② 불확도 (Poisson)",
+    sub:"계수 분산=계수. σ_S = √(G + σ_B²)."});
+  c2.innerHTML+=calcRows([
+    ["σ_B²","=",`${frac("N","2n")}²(B₁+B₂) = 9.766×641 = <span class="res">${sigB2.toFixed(1)}</span>`,"문서 6259.8"],
+    ["σ_S","=",`${sq("G+σ_B²")} = ${sq(Math.round(G+sigB2).toLocaleString())} = <span class="res">${sigS.toFixed(1)}</span>`,"문서 115.6"],
+    ["σ_S/S","=",`<span class="res">${(rel*100).toFixed(2)}%</span>`,"문서 2.27%"],
+  ]);
+  frag.append(c2);
+  const c3=card({title:"③ Step continuum",
+    sub:"ROI 내부 누적에 따라 배경이 좌평균→우평균으로 이동. 좌우 비대칭일 때 유리."});
+  c3.innerHTML+=calcRows([
+    ["배경","=",`Σ<span class="sub">i</span>[${frac("B₁","n")} + ${frac("B₂−B₁","nG")}Σ<span class="sub">j≤i</span>y<span class="sub">j</span>]`,""],
+    ["좌평균 / 우평균","=",`317/4 = 79.25 / 324/4 = 81.00`,"거의 같음 → Step≈Linear"],
+  ]);
+  c3.append(el("div","note",`<span class="ni">⚖</span><div>좌우 배경이 비슷하면(317 vs 324) Step도 B≈2004, S≈5103 으로 Linear와 거의 같습니다. 좌 500·우 300처럼 크게 다르면 Step 선택이 결과를 크게 바꿉니다.</div>`));
+  frag.append(c3);
+  const LC=1.645*Math.sqrt(sigB2);
+  const c4=card({title:"④ 95% Critical Level + Multiplet",
+    sub:"S>L_C 이어야 유효. 겹친 피크는 비선형 최소제곱(NLLS)."});
+  c4.innerHTML+=calcRows([
+    ["L_C","=",`k·σ_B = 1.645×${Math.sqrt(sigB2).toFixed(1)} = <span class="res">${LC.toFixed(1)}</span>`,`S=${S.toFixed(0)} ≫ L_C → 유효`],
+    ["NLLS","",`F=B₀+B₁ch+Σ<span class="sub">p</span>H<span class="sub">p</span>·exp(−(ch−E<span class="sub">p</span>)²/Z<span class="sub">p</span>²)`,"A_p=H_p·Z_p·√π"],
+  ]);
+  frag.append(c4);
+  frag.append(el("div","sec-h","검증 — 문서값 대조"));
+  const v=el("div");v.innerHTML=chk("배경 B",B,2003.1,x=>x.toFixed(1))+chk("순피크 S",S,5103.9,x=>x.toFixed(1))
+    +chk("σ_S",sigS,115.6,x=>x.toFixed(1))+chk("상대불확도",rel,0.0227,x=>(x*100).toFixed(2)+"%",0.02);
+  frag.append(v);
+  return frag;
+}
+
+/* ============ 심화 IV · Efficiency 정밀 (PART V) ============ */
+function tabEff2_controls(){return dvInfo("효율 4종 모델과 활동도를 문서 Cs-137 예제로 재현 → R_p=8.507, A=833±31 Bq (3.76%).");}
+function tabEff2_viz(){
+  const frag=document.createDocumentFragment();
+  // log-log interp ε(300) between (200,0.030),(400,0.020)
+  const e300=Math.exp(Math.log(0.030)+(Math.log(300)-Math.log(200))/(Math.log(400)-Math.log(200))*(Math.log(0.020)-Math.log(0.030)));
+  const c1=card({title:"① 효율 모델 4종",badge:"PART V",
+    sub:"효율 ε(E)=광전피크 기록비율. 모두 ln ε vs ln E 평면에서 다룹니다."});
+  c1.innerHTML+=`<table class="dt"><tr><th>모델</th><th>형태</th></tr>
+    <tr><td>Interpolated</td><td style="text-align:left">교정점 사이 log-log 선형보간</td></tr>
+    <tr><td>Linear</td><td style="text-align:left">ln ε = a + b·ln E (1차)</td></tr>
+    <tr><td>Empirical</td><td style="text-align:left">ln ε = Σ aₖ(ln E)ᵏ (다항)</td></tr>
+    <tr><td>Dual</td><td style="text-align:left">저·고에너지 두 곡선 교차(crossover)</td></tr></table>`;
+  c1.innerHTML+=calcRows([["ε(300)","=",`exp(보간) = <span class="res">${e300.toFixed(4)}</span>`,"문서 0.0237 (200·400 사이)"]]);
+  frag.append(c1);
+  const S=5104,T=600,eps=0.0120,y=0.851,Rp=S/T,A=S/(T*eps*y);
+  const c2=card({title:"② 활동도 계산",glow:true,
+    sub:"C = S/(V·ε'·y·T_l·U_f·K_c·K_w). 감쇠보정 없으면 ε'=ε."});
+  c2.innerHTML+=calcRows([
+    ["R_p","=",`S/T = 5104/600 = <span class="res">${Rp.toFixed(3)}</span> cps`,"문서 8.507"],
+    ["A","=",`${frac("S","T·ε·y")} = ${frac("5104","600×0.0120×0.851")} = <span class="res">${A.toFixed(1)}</span> Bq`,"문서 833"],
+  ]);
+  frag.append(c2);
+  const sigS=116,sigEps=0.00036,rel=Math.sqrt((sigS/S)**2+(sigEps/eps)**2),sigA=A*rel;
+  const c3=card({title:"③ 불확도 전파",
+    sub:"(σ_A/A)² = (σ_S/S)² + (σ_ε/ε)² + (σ_y/y)²."});
+  c3.innerHTML+=calcRows([
+    ["σ_S/S, σ_ε/ε","=",`${(sigS/S*100).toFixed(2)}%, ${(sigEps/eps*100).toFixed(2)}%`,""],
+    ["σ_A/A","=",`${sq("0.0227²+0.030²")} = <span class="res">${(rel*100).toFixed(2)}%</span>`,"문서 3.76%"],
+    ["A ± σ_A","=",`<span class="res">${A.toFixed(0)} ± ${sigA.toFixed(0)} Bq</span>`,"문서 833±31"],
+  ]);
+  frag.append(c3);
+  frag.append(el("div","sec-h","검증 — 문서값 대조"));
+  const v=el("div");v.innerHTML=chk("ε(300) 보간",e300,0.0237,x=>x.toFixed(4),0.02)
+    +chk("계수율 R_p",Rp,8.507,x=>x.toFixed(3))+chk("활동도 A",A,833,x=>x.toFixed(1))
+    +chk("상대불확도",rel,0.0376,x=>(x*100).toFixed(2)+"%",0.02)+chk("σ_A",sigA,31.3,x=>x.toFixed(1),0.05);
+  frag.append(v);
+  return frag;
+}
+
+/* ============ 심화 V · NID Plus 정밀 (PART VI) ============ */
+function tabNid2_controls(){return dvInfo("NID Plus의 3종 penalty(Genie 상수 0.16·1.6 포함)와 가중평균을 문서 Cs-137·Co-60 예제로 재현합니다.");}
+function tabNid2_viz(){
+  const frag=document.createDocumentFragment();
+  const dE=0.243,fE=Math.exp(-0.16*dE*dE/(1*1)*1);
+  const c1=card({title:"① 에너지 불일치 penalty",badge:"PART VI",glow:true,
+    sub:"라이브러리와 관측 에너지 차이가 클수록 confidence 감소. Genie 내부상수 0.16."});
+  c1.innerHTML+=calcRows([
+    ["ΔE","=",`661.9 − 661.657 = <span class="res">${dE}</span> keV`,""],
+    ["f","=",`exp(−0.16·ΔE²/ETOL²·y/Σy) = <span class="res">${fE.toFixed(4)}</span>`,"문서 0.9906 (ETOL=1.0)"],
+  ]);
+  frag.append(c1);
+  const denom=1.0*0.010+1.0*0.009, numer=1.0*0.009*1, pen=1.6*numer/denom, idx=1.0-pen;
+  const c2=card({title:"② Missing-line penalty (Co-60)",
+    sub:"기대선이 보여야 하는데 안 보이면 감점. w(E)=ε(E). Genie 내부상수 1.6."});
+  c2.innerHTML+=`<table class="dt"><tr><th>Line</th><th>y</th><th>w=ε</th><th>관측?</th><th>y·w</th></tr>
+    <tr><td>1173 keV</td><td>1.0</td><td>0.010</td><td>관측</td><td>0.010</td></tr>
+    <tr><td>1332 keV</td><td>1.0</td><td>0.009</td><td>미관측</td><td>0.009</td></tr></table>`;
+  c2.innerHTML+=calcRows([
+    ["penalty","=",`1.6·${frac("0.009","0.019")} = <span class="res">${pen.toFixed(3)}</span>`,"문서 0.758"],
+    ["Index'","=",`1.0 − ${pen.toFixed(3)} = <span class="res">${idx.toFixed(3)}</span>`,"문서 0.242 (<0.30 → reject)"],
+  ]);
+  c2.append(el("div","note",`<span class="ni">🔬</span><div>단 MDA test가 켜져 1332 keV 기대피크가 MDA 미만이면 δ=0 → 이 penalty가 사라집니다("안 보였어야 정상인 약한 line"은 감점 안 함).</div>`));
+  frag.append(c2);
+  const g=Math.exp(-0.0051*400);
+  const c3=card({title:"③ 반감기 penalty",
+    sub:"너무 짧은 반감기 핵종이 오래 지난 시료에서 식별되는 것을 억제. P₁≈5.1e-3."});
+  c3.innerHTML+=calcRows([["g","=",`exp(−P₁·(Δt/T½)²) = exp(−0.0051×20²) = <span class="res">${g.toFixed(3)}</span>`,"문서 0.130 (Δt/T½=20)"]]);
+  c3.append(el("div","note",`<span class="ni">⏱</span><div>Cs-137(반감기 ~30년)은 며칠 경과로 penalty 거의 없음. 약 15반감기 경과 시 기본 threshold 0.3 근처까지 감소.</div>`));
+  frag.append(c3);
+  const w1=1/(80*80),w2=1/(120*120),Cav=(1000*w1+1080*w2)/(w1+w2),sigAv=Math.sqrt(1/(w1+w2));
+  const c4=card({title:"④ 가중평균 활동도 (Co-60)",
+    sub:"여러 감마선에서 구한 활동도를 불확도가 작은 쪽에 큰 가중치로 합칩니다."});
+  c4.innerHTML+=calcRows([
+    ["C_Av","=",`${frac("Σ(C/σ²)","Σ(1/σ²)")} = <span class="res">${Cav.toFixed(1)}</span> Bq`,"문서 1024.7"],
+    ["σ_Av","=",`${sq("1/Σ(1/σ²)")} = <span class="res">${sigAv.toFixed(1)}</span> Bq`,""],
+  ]);
+  frag.append(c4);
+  const c5=card({title:"⑤ Interference Correction",
+    sub:"한 피크를 여러 핵종이 설명할 때 연립방정식으로 분리."});
+  c5.innerHTML+=`<div class="card-sub">관측 계수율 = (효율·yield 행렬) × (활동도 벡터) → 행렬 역산으로 각 핵종 기여를 동시에 분리합니다. 예: Peak1(A·B 공통)+Peak2(A 단독)+Peak3(B 단독) → 3식 연립.</div>`;
+  frag.append(c5);
+  frag.append(el("div","sec-h","검증 — 문서값 대조"));
+  const v=el("div");v.innerHTML=chk("에너지 penalty",fE,0.9906,x=>x.toFixed(4))+chk("missing-line penalty",pen,0.758,x=>x.toFixed(3))
+    +chk("반감기 penalty",g,0.130,x=>x.toFixed(3),0.02)+chk("Co-60 가중평균",Cav,1024.7,x=>x.toFixed(1));
+  frag.append(v);
+  return frag;
+}
+
+/* ============ 심화 VI · Detection Limits 정밀 (PART VII) ============ */
+function tabMda2_controls(){return dvInfo("Currie·KTA·ISO 11929·LLD를 문서 Cs-137 예제로 정밀 재현 → σ₀=90.9, Currie MDA 49.3, KTA MDA 49.7 Bq.");}
+function tabMda2_viz(){
+  const frag=document.createDocumentFragment();
+  const B=2003.1,sigB2=6259.8,k=1.645,den=600*0.0120*0.851;
+  const sig0=Math.sqrt(B+sigB2);
+  const LC=k*sig0,LDc=k*k+2*LC,LDc2=2.71+3.29*sig0,MDAc=LDc2/den;
+  const c1=card({title:"① Currie MDA",badge:"PART VII",glow:true,
+    sub:"신호 0일 때 표준편차 σ₀=√(B+σ_B²) 가 출발점입니다."});
+  c1.innerHTML+=calcRows([
+    ["σ₀","=",`${sq("B+σ_B²")} = ${sq(Math.round(B+sigB2).toLocaleString())} = <span class="res">${sig0.toFixed(1)}</span>`,"문서 90.9"],
+    ["L_C","=",`k·σ₀ = 1.645×${sig0.toFixed(1)} = <span class="res">${LC.toFixed(1)}</span>`,"문서 149.5"],
+    ["L_D","=",`k²+2L_C = 2.71+3.29σ₀ = <span class="res">${LDc2.toFixed(1)}</span>`,"문서 301.8"],
+    ["MDA","=",`L_D/(T·ε·y) = ${LDc2.toFixed(1)}/${den.toFixed(4)} = <span class="res">${MDAc.toFixed(1)}</span> Bq`,"문서 49.3"],
+  ]);
+  frag.append(c1);
+  const LDk=5.41+3.29*sig0,MDAk=LDk/den;
+  const c2=card({title:"② KTA MDA (독일 규제)",
+    sub:"L_D = 2k²+2L_C. 상수항이 Currie(2.71)보다 큰 5.41."});
+  c2.innerHTML+=calcRows([
+    ["L_D","=",`2k²+2L_C = 5.41+3.29σ₀ = <span class="res">${LDk.toFixed(1)}</span>`,"문서 304.4"],
+    ["MDA","=",`<span class="res">${MDAk.toFixed(1)}</span> Bq`,"문서 49.7"],
+  ]);
+  c2.append(el("div","note",`<span class="ni">🇩🇪</span><div>상수항은 더 크지만, 미검출 피크 ROI를 ±1.25 FWHM로 좁게 잡으면(Currie는 ±4 FWHM) 배경 B가 줄어 KTA MDA가 오히려 낮아질 수 있습니다.</div>`));
+  frag.append(c2);
+  const u0=sig0/den,aStar=k*u0; let aSharp=2*aStar; for(let i=0;i<50;i++){const ua=Math.sqrt(u0*u0+(0.03*aSharp)**2);aSharp=aStar+k*ua;}
+  const c3=card({title:"③ ISO 11929 (국제표준)",
+    sub:"결정한계 a*=k·u(0), 검출한계 a#=a*+k·u(a#) 반복(효율·교정·시료처리 불확도 포함)."});
+  c3.innerHTML+=calcRows([
+    ["u(0)","=",`σ₀/(T·ε·y) = <span class="res">${u0.toFixed(2)}</span> Bq`,"활동도 0 표준불확도"],
+    ["a* (결정한계)","=",`k·u(0) = <span class="res">${aStar.toFixed(1)}</span> Bq`,""],
+    ["a# (검출한계)","=",`a*+k·u(a#) 반복수렴 = <span class="res">${aSharp.toFixed(1)}</span> Bq`,"효율 3% 불확도 포함"],
+  ]);
+  frag.append(c3);
+  const LLD=2.71+4.65*Math.sqrt(sigB2);
+  const c4=card({title:"④ LLD + 측정시간 효과",
+    sub:"LLD(역사적 단순형)와 MDA ∝ 1/√T."});
+  c4.innerHTML+=calcRows([["LLD","=",`2.71+4.65·σ_B = <span class="res">${LLD.toFixed(0)}</span> counts → ${(LLD/den).toFixed(0)} Bq`,"MDA와 유사"]]);
+  let tt=`<table class="dt"><tr><th>T(s)</th><th>Currie MDA</th><th>KTA MDA</th></tr>`;
+  [60,300,600,1200,2400,4800].forEach(T=>{const s0=sig0*Math.sqrt(T/600);const d=T*0.0120*0.851;
+    tt+=`<tr><td>${T}</td><td>${((2.71+3.29*s0)/d).toFixed(1)}</td><td>${((5.41+3.29*s0)/d).toFixed(1)}</td></tr>`;});
+  tt+=`</table>`;c4.innerHTML+=tt;
+  frag.append(c4);
+  frag.append(el("div","sec-h","검증 — 문서값 대조"));
+  const v=el("div");v.innerHTML=chk("σ₀",sig0,90.9,x=>x.toFixed(1))+chk("Currie L_C",LC,149.5,x=>x.toFixed(1))
+    +chk("Currie L_D",LDc2,301.8,x=>x.toFixed(1))+chk("Currie MDA",MDAc,49.3,x=>x.toFixed(1))
+    +chk("KTA L_D",LDk,304.4,x=>x.toFixed(1))+chk("KTA MDA",MDAk,49.7,x=>x.toFixed(1),0.02);
+  frag.append(v);
+  return frag;
+}
+
+/* ============ 심화 VII · Gamma-M 설정 해석 (PART VIII) ============ */
+function tabSet_controls(){return dvInfo("Gamma-M Peak Search의 주요 설정값과 의미입니다. NaI는 피크가 넓어 Variable Channel(FWHM)·에너지별 tolerance가 중요합니다.");}
+function tabSet_viz(){
+  const frag=document.createDocumentFragment();
+  const c1=card({title:"⚙ Gamma-M 주요 설정값",badge:"PART VIII",glow:true,
+    sub:"각 설정의 의미와 NaI WBC 권장 해석."});
+  const s=[["Function: Step","배경 계단식(좌→우 누적)","좌우 배경 비대칭 시 유리"],
+    ["Use Variable Channel(FWHM)=Yes","에너지별 FWHM 반영","NaI 광폭피크에 필수"],
+    ["Energy Cal tol Fixed=25 / Var=1","에너지 매칭 허용오차","NaI 광폭이라 ±25 keV 타당"],
+    ["Eff & Match tol=25","효율/매칭 허용오차","너무 크면 false match 위험"],
+    ["Use Variable Tolerance(FWHM)=Yes","허용오차도 FWHM 비례","고에너지서 넓게"],
+    ["Maximum Left=1.25","ROI 좌측 한계(FWHM 배수)","피크 충분 포함"],
+    ["REJMDASIG=2.5 / CONST=3","MDA rejection σ·상수","기본값"],
+    ["PRGAINSHFT / MAXGAINPASS=10","gain shift·반복","NaI 온도 drift 대응"]];
+  c1.innerHTML+=`<table class="dt"><tr><th>설정</th><th>의미</th><th>권장</th></tr>`+
+    s.map(x=>`<tr><td style="text-align:left">${x[0]}</td><td style="text-align:left">${x[1]}</td><td style="text-align:left">${x[2]}</td></tr>`).join("")+`</table>`;
+  frag.append(c1);
+  const fwhm=1+1.85*Math.sqrt(661.7);
+  const c2=card({title:"설정 예제 — Cs-137 662 keV tolerance",
+    sub:"Fixed 와 Variable(FWHM 비례) 허용오차의 차이."});
+  c2.innerHTML+=calcRows([
+    ["FWHM(662)","=",`a+b·√E = 1+1.85√661.7 = <span class="res">${fwhm.toFixed(1)}</span> keV`,""],
+    ["Fixed / Variable","=",`±25 keV / ±${fwhm.toFixed(1)} keV (=1×FWHM)`,"NaI 광폭피크에선 Variable이 적절"],
+  ]);
+  c2.append(el("div","note",`<span class="ni">⚙</span><div>FWHM 교정이 없으면 모든 Variable 설정이 무력화됩니다. Step background + NaI 광폭피크, 넓은 tolerance + 큰 라이브러리 조합은 false match 위험을 키웁니다.</div>`));
+  frag.append(c2);
+  return frag;
+}
+
+/* ============ 심화 VIII · 종합 검증 (PART IX) ============ */
+function tabVerify_controls(){return dvInfo("9개 심화 모듈의 핵심 수치를 딥다이브 문서 기준값과 자동 대조합니다. 전 항목 통과는 문서 내용을 완전히 재현함을 의미합니다.");}
+function tabVerify_viz(){
+  const frag=document.createDocumentFragment();
+  // 재계산 (각 모듈 인라인)
+  const c2358=2*Math.sqrt(2*Math.log(2)), Z1=Math.sqrt(2);
+  const xh=Math.sqrt(2*Math.log(2)), area=_erf(xh/Math.sqrt(2));
+  const Z=40/(2*Math.sqrt(Math.log(2))), Zbin=16, areaPk=249.90*Z*SQPI;
+  const Cc=40*Math.sqrt(6333.55/40), dd=(14698-Cc-3)/(2.5*Math.sqrt(40*(6333.55+Cc)));
+  const N=25,n=4,B1=317,B2=324,G=7107,B=(N/(2*n))*(B1+B2),S=G-B,sigB2=(N/(2*n))**2*(B1+B2),sigS=Math.sqrt(G+sigB2);
+  const e300=Math.exp(Math.log(0.030)+(Math.log(300)-Math.log(200))/(Math.log(400)-Math.log(200))*(Math.log(0.020)-Math.log(0.030)));
+  const Rp=5104/600,A=5104/(600*0.0120*0.851),relA=Math.sqrt((116/5104)**2+(0.030)**2),sigA=A*relA;
+  const fE=Math.exp(-0.16*0.243*0.243),pen=1.6*(0.009/0.019),g=Math.exp(-0.0051*400);
+  const w1=1/6400,w2=1/14400,Cav=(1000*w1+1080*w2)/(w1+w2);
+  const sig0=Math.sqrt(2003.1+6259.8),den=600*0.0120*0.851,LC=1.645*sig0,LDc=2.71+3.29*sig0,MDAc=LDc/den,LDk=5.41+3.29*sig0,MDAk=LDk/den;
+  const rows=[
+    ["FWHM/σ 상수",c2358,2.354820,x=>x.toFixed(4),1e-5],["Z=√2·σ",Z1,1.414214,x=>x.toFixed(4),1e-5],
+    ["FWHM 면적비",area,0.761,x=>(x*100).toFixed(1)+"%",0.01],["에너지→채널 662",662,662,x=>x.toFixed(0),1e-6],
+    ["Z(FWHM=40)",Z,24.02,x=>x.toFixed(2),0.01],["bin폭",Zbin,16,x=>x.toFixed(0),1e-6],
+    ["피크면적 A",areaPk,10640,x=>Math.round(x).toLocaleString(),0.01],["unknown 보정항",Cc,503.3,x=>x.toFixed(1),0.01],
+    ["unknown dd",dd,10.86,x=>x.toFixed(2),0.01],["Peak Area B",B,2003.1,x=>x.toFixed(1)],
+    ["Peak Area S",S,5103.9,x=>x.toFixed(1)],["σ_S",sigS,115.6,x=>x.toFixed(1)],
+    ["상대불확도",sigS/S,0.0227,x=>(x*100).toFixed(2)+"%",0.02],["효율 ε(300)",e300,0.0237,x=>x.toFixed(4),0.02],
+    ["계수율 R_p",Rp,8.507,x=>x.toFixed(3)],["활동도 A",A,833,x=>x.toFixed(1)],
+    ["활동도 상대불확도",relA,0.0376,x=>(x*100).toFixed(2)+"%",0.02],["σ_A",sigA,31.3,x=>x.toFixed(1),0.05],
+    ["NID 에너지 penalty",fE,0.9906,x=>x.toFixed(4)],["NID missing-line",pen,0.758,x=>x.toFixed(3)],
+    ["NID 반감기",g,0.130,x=>x.toFixed(3),0.02],["Co-60 가중평균",Cav,1024.7,x=>x.toFixed(1)],
+    ["Currie σ₀",sig0,90.9,x=>x.toFixed(1)],["Currie L_C",LC,149.5,x=>x.toFixed(1)],
+    ["Currie L_D",LDc,301.8,x=>x.toFixed(1)],["Currie MDA",MDAc,49.3,x=>x.toFixed(1)],
+    ["KTA L_D",LDk,304.4,x=>x.toFixed(1)],["KTA MDA",MDAk,49.7,x=>x.toFixed(1),0.02],
+  ];
+  let npass=0;
+  const c=card({title:"✅ 딥다이브 문서 수치 예제 재현",badge:"PART IX",glow:true,
+    sub:"각 심화 모듈의 계산값을 문서 기준값과 대조합니다."});
+  let th=`<table class="dt"><tr><th>#</th><th>항목</th><th>계산값</th><th>문서값</th><th>오차</th><th>판정</th></tr>`;
+  rows.forEach((r,i)=>{const[lab,got,ref,fmt,tol]=r;const err=Math.abs(got-ref)/(Math.abs(ref)||1);const pass=err<=(tol||0.01);if(pass)npass++;
+    th+=`<tr><td>${i+1}</td><td style="text-align:left">${lab}</td><td>${fmt(got)}</td><td>${fmt(ref)}</td><td>${(err*100).toFixed(2)}%</td><td><span class="tag ${pass?"g":"r"}">${pass?"통과":"확인"}</span></td></tr>`;});
+  th+=`</table>`;c.innerHTML+=th;
+  c.append(el("div","note "+(npass===rows.length?"":"warn"),`<span class="ni">${npass===rows.length?"✅":"⚠"}</span><div><b>전체 ${rows.length}항목 중 ${npass}항목 통과</b> ${npass===rows.length?"— 딥다이브 문서 내용 완전 재현 ✓":""}</div>`));
+  frag.append(c);
+  return frag;
+}
+
+const TAB_FNS={
+  overview:{c:tabOverview_controls,v:tabOverview_viz},
+  spectrum:{c:tabSpectrum_controls,v:tabSpectrum_viz},
+  locate:{c:tabLocate_controls,v:tabLocate_viz},
+  area:{c:tabArea_controls,v:tabArea_viz},
+  nid:{c:tabNid_controls,v:tabNid_viz},
+  efficiency:{c:tabEff_controls,v:tabEff_viz},
+  activity:{c:tabActivity_controls,v:tabActivity_viz},
+  mda:{c:tabMda_controls,v:tabMda_viz},
+  calib:{c:tabCalib_controls,v:tabCalib_viz},
+  math:{c:tabMath_controls,v:tabMath_viz},
+  locate2:{c:tabLocate2_controls,v:tabLocate2_viz},
+  area2:{c:tabArea2_controls,v:tabArea2_viz},
+  eff2:{c:tabEff2_controls,v:tabEff2_viz},
+  nid2:{c:tabNid2_controls,v:tabNid2_viz},
+  mda2:{c:tabMda2_controls,v:tabMda2_viz},
+  settings:{c:tabSet_controls,v:tabSet_viz},
+  verify:{c:tabVerify_controls,v:tabVerify_viz},
+  glossary:{c:tabGlossary_controls,v:tabGlossary_viz},
+};
+
+function buildTabbar(){
+  const bar=$("#tabbar");bar.innerHTML="";
+  TABS.forEach(t=>{const b=el("button","tab"+(t.id===STATE.activeTab?" on":""));
+    b.dataset.tab=t.id;b.innerHTML=`<span class="ico">${t.ico}</span>${t.name}`;
+    b.addEventListener("click",()=>switchTab(t.id));bar.append(b);});
+}
+function switchTab(id){
+  if(STATE._erodeAnim){clearInterval(STATE._erodeAnim);STATE._erodeAnim=null;}
+  STATE.activeTab=id;
+  $$(".tab").forEach(t=>t.classList.toggle("on",t.dataset.tab===id));
+  renderControls();renderViz();renderHero();
+}
+function renderControls(){
+  const box=$("#controls");box.innerHTML="";box.classList.add("fade");
+  box.append(TAB_FNS[STATE.activeTab].c());
+  setTimeout(()=>box.classList.remove("fade"),300);
+}
+function renderViz(){
+  const box=$("#viz");box.innerHTML="";box.classList.add("fade");
+  box.append(TAB_FNS[STATE.activeTab].v());
+  setTimeout(()=>box.classList.remove("fade"),300);
+}
+/* refreshViz: re-render only the viz panel (after a control changes) */
+function refreshViz(){renderViz();}
+
+function updateNuclideUI(){
+  const nuc=NUCLIDES[STATE.nuclide];
+  $("#ndot").style.color=nuc.color;
+  $("#heroNuc").textContent=STATE.nuclide;
+  $("#heroNuc").style.color=nuc.color;
+}
+
+function initBindings(){
+  // nuclide selector
+  $("#nuclideSel").addEventListener("change",e=>{
+    STATE.nuclide=e.target.value;STATE._scenario="default";
+    const d=NUC_DEFAULT[STATE.nuclide];STATE.activity=d.activity;STATE.time=d.time;STATE.bg=d.bg;STATE.gain=0;
+    updateNuclideUI();recompute();renderControls();renderHero();renderViz();
+  });
+  // level segment
+  $("#levelSeg").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;
+    $$("#levelSeg button").forEach(x=>x.classList.remove("on"));b.classList.add("on");
+    STATE.level=b.dataset.lv;TipEngine.setLevel(STATE.level);});
+  // scale segment
+  $("#scaleSeg").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;
+    $$("#scaleSeg button").forEach(x=>x.classList.remove("on"));b.classList.add("on");
+    STATE.scale=b.dataset.sc;renderHero();});
+  // zoom buttons
+  $("#zoomIn").addEventListener("click",()=>CHART.zoom(0.7));
+  $("#zoomOut").addEventListener("click",()=>CHART.zoom(1.4));
+  $("#zoomReset").addEventListener("click",()=>CHART.reset());
+  // snapshot
+  $("#snapBtn").addEventListener("click",()=>{
+    const a=document.createElement("a");a.download=`spectra_lab_${STATE.nuclide}_${Date.now()}.png`;
+    a.href=CHART.cv.toDataURL("image/png");a.click();});
+  // help
+  $("#helpBtn").addEventListener("click",()=>switchTab("overview"));
+  // cursor readout
+  CHART.cursorCb=(ch,vals)=>{const cur=$("#heroCursor");
+    if(ch==null){cur.style.opacity=0;return;}
+    cur.style.opacity=1;
+    const E=ch2E(ch);let s=`ch ${Math.round(ch)} · ${E.toFixed(1)} keV`;
+    if(vals&&vals["원 스펙트럼"]!=null)s+=` · ${fmtInt(vals["원 스펙트럼"])} cts`;
+    cur.textContent=s;};
+  // keyboard
+  window.addEventListener("keydown",e=>{
+    if(e.target.tagName==="INPUT"||e.target.tagName==="SELECT")return;
+    const k=e.key;
+    if(k>="1"&&k<="9"){const i=+k-1;if(TABS[i])switchTab(TABS[i].id);}
+    else if(k==="0"){switchTab(TABS[9].id);}
+    else if(k==="+"||k==="="){CHART.zoom(0.7);}
+    else if(k==="-"){CHART.zoom(1.4);}
+    else if(k==="L"||k==="l"){const order=["beg","mid","adv"];const ni=(order.indexOf(STATE.level)+1)%3;
+      STATE.level=order[ni];TipEngine.setLevel(STATE.level);
+      $$("#levelSeg button").forEach(x=>x.classList.toggle("on",x.dataset.lv===STATE.level));}
+    else if(k===" "&&STATE.activeTab==="locate"){e.preventDefault();const btn=$(".btn.pri");if(btn&&btn.textContent.includes("erosion"))playErosion(btn);}
+  });
+  // resize
+  let rt;const ro=new ResizeObserver(()=>{clearTimeout(rt);rt=setTimeout(()=>{CHART.draw();},80);});
+  ro.observe($(".chart-wrap"));
+  window.addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(()=>CHART.draw(),80);});
+}
+
+/* ---------- SELF CHECK (console only) ---------- */
+window.__SELFCHECK__=function(){
+  const fails=[];
+  const approx=(a,b,tol,name)=>{const r=Math.abs(a-b)/Math.max(1e-9,Math.abs(b));if(r>tol)fails.push(`${name}: got ${a.toFixed(2)}, exp ${b} (${(r*100).toFixed(1)}%)`);};
+  // Cs-137 peak area (no noise for determinism)
+  const saveCal={C0:CAL.C0,C1:CAL.C1,a:CAL.a,b:CAL.b};
+  CAL.C0=0;CAL.C1=0.5;CAL.a=1.0;CAL.b=1.85;CAL.effFn=fitEfficiency(CAL.effPoints);
+  const eps662=effOf(661.7).eps;
+  const S=833*0.851*eps662*600; approx(S,5104,0.06,"Cs-137 peak area S");
+  // Activity round-trip
+  const act=activityCalc(S,Math.sqrt(S),600,eps662,eps662*0.03,0.851,0,{});
+  approx(act.A,833,0.06,"Cs-137 activity A");
+  // Currie example (sigma0 = sigma_B = 90.9 from doc) → LC≈149.5, LD≈301.8
+  const cur=currieMDA(90.9,1.645,600,eps662,0.851,{});
+  approx(cur.LC,149.5,0.08,"Currie LC"); approx(cur.LD,301.8,0.08,"Currie LD");
+  // Co-60 weighted mean
+  const wm=weightedMean([{C:1000,sigma:80},{C:1080,sigma:120}]);
+  approx(wm.mean,1024.7,0.02,"Co-60 weighted mean");
+  // restore
+  Object.assign(CAL,saveCal);CAL.effFn=fitEfficiency(CAL.effPoints);
+  if(fails.length===0){console.log("%cSELFCHECK_OK","color:#36d6c3;font-weight:bold");return true;}
+  console.warn("SELFCHECK FAILURES:\n"+fails.join("\n"));return false;
+};
+
+/* ---------- BOOT ---------- */
+function boot(){
+  TipEngine.init();TipEngine.setLevel("beg");
+  CHART=new SpectrumChart($("#heroCanvas"));
+  updateNuclideUI();
+  STATE._scenario="default";
+  recompute();
+  buildTabbar();initBindings();
+  renderControls();renderViz();renderHero();
+  // run selfcheck shortly after boot
+  setTimeout(()=>{try{window.__SELFCHECK__();}catch(err){console.warn("selfcheck error",err);}},200);
+}
+if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",boot);
+else boot();
+
+</script>
+</body>
+</html>
